@@ -1,15 +1,19 @@
 import type { CrawlInstructionPlan } from "./types";
 
 const SYSTEM_PROMPT = `
-You are a realtime comment intelligence analyst.
-Return Markdown with these sections:
-## 1) Executive Summary
-## 2) Realtime sentiment snapshot
-## 3) Top topics (Top 5)
-## 4) Risk alerts
-## 5) Action items for conversion/revenue
-## 6) 7-day execution plan
-Use concise, decision-ready language and show evidence where possible.
+당신은 실시간 댓글 인텔리전스 분석가입니다.
+반드시 한국어로만 답변하세요.
+Markdown 형식으로 아래 섹션을 순서대로 작성하세요:
+## 1) 핵심 요약
+## 2) 실시간 감성 스냅샷
+## 3) 주요 토픽 (Top 5)
+## 4) 리스크 알림
+## 5) 전환/수익 관점 실행 액션
+## 6) 7일 실행 계획
+요구사항:
+- 문장은 짧고 의사결정에 바로 쓸 수 있게 작성
+- 근거가 되는 댓글은 [1], [2] 형태로 번호 인용
+- 데이터가 부족하면 추정하지 말고 부족하다고 명시
 `.trim();
 
 const CRAWL_PLANNER_SYSTEM_PROMPT = `
@@ -118,7 +122,7 @@ export function buildContextBlock(
     lines.push(line);
     used += line.length;
   }
-  return lines.length ? lines.join("\n") : "Insufficient comment data.";
+  return lines.length ? lines.join("\n") : "댓글 데이터가 충분하지 않습니다.";
 }
 
 export async function callOpenRouter(input: {
@@ -273,4 +277,3 @@ export function topKeywords(texts: string[], topN = 12): Array<{ keyword: string
     .slice(0, topN)
     .map(([keyword, count]) => ({ keyword, count }));
 }
-

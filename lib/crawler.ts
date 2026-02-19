@@ -226,7 +226,10 @@ async function crawlStatic(
       commentsFound,
       commentsKept: comments.length,
       modeUsed: "static",
-      notes: "",
+      notes:
+        commentsFound > 0
+          ? ""
+          : `댓글 노드를 찾지 못했습니다. commentSelector="${cfg.commentSelector}"`,
       lastCursor: null,
     },
   };
@@ -362,7 +365,10 @@ async function crawlApiJson(
       commentsFound,
       commentsKept: comments.length,
       modeUsed: "api_json",
-      notes: "",
+      notes:
+        commentsFound > 0
+          ? ""
+          : `API 응답에서 댓글 배열을 찾지 못했습니다. apiCommentsPath="${cfg.apiCommentsPath}"`,
       lastCursor: cursor,
     },
   };
@@ -383,4 +389,3 @@ export async function crawlComments(
   }
   return crawlStatic(cfg, sinceDate);
 }
-

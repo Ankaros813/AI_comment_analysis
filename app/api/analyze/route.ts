@@ -130,6 +130,48 @@ function maxPublishedIso(rows: Array<{ published_at?: string | null }>): string 
   return max > 0 ? new Date(max).toISOString() : new Date().toISOString();
 }
 
+function buildNoDataMessage(cfg: RuntimeConfig, crawlNotes: string): string {
+  let host = "";
+  try {
+    host = new URL(cfg.sourceUrl).host.toLowerCase();
+  } catch {}
+  const isNaverNews = host.includes("naver.com") && cfg.sourceUrl.includes("/article/");
+
+  const lines = [
+    "## 수집 결과 안내",
+    "- 이번 실행에서 새 댓글이 수집되지 않았습니다.",
+    "- 그래서 문서/임베딩 테이블에도 새로 저장된 항목이 없습니다.",
+    "",
+    "## 가능한 원인",
+    "- 현재 페이지의 댓글이 정적 HTML에 없고, 브라우저에서 JS로 동적 로딩되는 구조",
+    "- `HTML Selectors`가 실제 댓글 DOM 구조와 불일치",
+    "- 로그인/쿠키/헤더가 필요한 댓글 API 구조",
+  ];
+
+  if (crawlNotes) {
+    lines.push("", "## 크롤링 노트", `- ${crawlNotes}`);
+  }
+
+  lines.push(
+    "",
+    "## 바로 시도할 해결 방법",
+    "- `Crawl Mode`를 `api_json`으로 바꾸고 실제 댓글 API endpoint/path를 지정",
+    "- 또는 `HTML Selectors`에서 댓글/작성자/시간 selector를 해당 사이트 구조에 맞게 수정",
+    "- 테스트 시 `Max Pages`를 1~2로 낮춰 빠르게 검증",
+  );
+
+  if (isNaverNews) {
+    lines.push(
+      "",
+      "## 네이버 뉴스 URL 안내",
+      "- 네이버 뉴스 댓글은 동적 렌더링 비중이 높아 `static` 모드에서 0건이 나올 수 있습니다.",
+      "- 이 경우 `api_json` 설정 또는 사이트 맞춤 크롤러 구성이 필요합니다.",
+    );
+  }
+
+  return lines.join("\n");
+}
+
 function applyCrawlPlanToComments(
   comments: CrawledComment[],
   plan: CrawlInstructionPlan | null,
@@ -352,16 +394,19 @@ export async function POST(req: Request) {
       })) as Record<string, unknown>[];
     }
 
-    const analysisMarkdown = await callOpenRouter({
-      apiKey: openrouterKey,
-      modelName: cfg.modelName,
-      sourceUrl: cfg.sourceUrl,
-      userQuery: cfg.userQuery,
-      docs: ragDocs,
-      maxContextChars,
-      timeoutMs: timeoutSec * 1000,
-      useMasked: cfg.piiMaskBeforeModel,
-    });
+    const analysisMarkdown =
+      ragDocs.length || documentRows.length
+        ? await callOpenRouter({
+            apiKey: openrouterKey,
+            modelName: cfg.modelName,
+            sourceUrl: cfg.sourceUrl,
+            userQuery: cfg.userQuery,
+            docs: ragDocs,
+            maxContextChars,
+            timeoutMs: timeoutSec * 1000,
+            useMasked: cfg.piiMaskBeforeModel,
+          })
+        : buildNoDataMessage(cfg, crawl.report.notes);
 
     const textKey = cfg.piiMaskBeforeModel ? "pii_masked_content" : "content";
     const sentiments = { positive: 0, neutral: 0, negative: 0 };
