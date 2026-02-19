@@ -10,6 +10,8 @@ type AnalyzeResponse = {
     pagesScanned: number;
     commentsFound: number;
     commentsKept: number;
+    uniqueExternalIds?: number;
+    externalIdDedupDropped?: number;
     storedDocs: number;
     embeddedDocs: number;
     embeddingSkippedUnchanged: number;
@@ -589,6 +591,10 @@ export default function HomePage() {
                     <div className="v">{result.ingestion.commentsFound}</div>
                   </div>
                   <div className="metric">
+                    <div className="k">Unique IDs</div>
+                    <div className="v">{result.ingestion.uniqueExternalIds ?? result.ingestion.commentsKept}</div>
+                  </div>
+                  <div className="metric">
                     <div className="k">Stored docs</div>
                     <div className="v">{result.ingestion.storedDocs}</div>
                   </div>
@@ -628,6 +634,9 @@ export default function HomePage() {
                 <p className="muted">
                   mode={result.ingestion.crawlMode}
                   {result.ingestion.crawlNotes ? ` | note=${result.ingestion.crawlNotes}` : ""}
+                  {typeof result.ingestion.externalIdDedupDropped === "number"
+                    ? ` | dedup_dropped=${result.ingestion.externalIdDedupDropped}`
+                    : ""}
                 </p>
                 <p className="muted">
                   embedding={result.ingestion.embeddingProvider || "unknown"} /{" "}

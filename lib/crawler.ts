@@ -96,15 +96,24 @@ function getByPath(obj: unknown, path: string): unknown {
 function parseJsonOrJsonp(raw: string): unknown | null {
   const text = (raw || "").trim();
   if (!text) return null;
+  const naverIdFields = ["commentNo", "parentCommentNo", "replyNo"];
+  const quoteLargeNaverIds = (jsonText: string): string => {
+    let out = jsonText;
+    for (const field of naverIdFields) {
+      const re = new RegExp(`("${field}"\\s*:\\s*)(-?\\d{16,})(?=\\s*[,}])`, "g");
+      out = out.replace(re, '$1"$2"');
+    }
+    return out;
+  };
   try {
-    return JSON.parse(text);
+    return JSON.parse(quoteLargeNaverIds(text));
   } catch {}
   const start = text.indexOf("(");
   const end = text.lastIndexOf(")");
   if (start > 0 && end > start) {
     const inner = text.slice(start + 1, end).trim();
     try {
-      return JSON.parse(inner);
+      return JSON.parse(quoteLargeNaverIds(inner));
     } catch {}
   }
   return null;
@@ -333,11 +342,17 @@ function mapNaverCommentRow(input: {
   const isDeleted = deletedByFlag || deletedByText;
   if (!isDeleted && content.length < input.cfg.minCommentLength) return null;
 
-  let externalId = normalizeWhitespace(String(input.row.commentNo || ""));
+  const rawCommentNo = input.row.commentNo;
+  let externalId = normalizeWhitespace(String(rawCommentNo || ""));
   const replyLevel = toFiniteInt(input.row.replyLevel, 1);
   const parentRaw = normalizeWhitespace(String(input.row.parentCommentNo || ""));
   const parentId = normalizeWhitespace(input.parentHint || parentRaw);
   const isReply = Boolean(input.parentHint) || replyLevel >= 2 || (parentRaw && parentRaw !== externalId);
+  const unsafeNumericId = typeof rawCommentNo === "number" && !Number.isSafeInteger(rawCommentNo);
+  if (unsafeNumericId && externalId) {
+    const suffix = stableSha1(`${author}|${publishedIso || ""}|${content}`).slice(0, 12);
+    externalId = `${externalId}:${suffix}`;
+  }
   if (!externalId) {
     externalId = stableSha1(
       `${input.cfg.sourceUrl}|${parentId}|${input.pageNum}|${author}|${publishedIso || ""}|${content}`,

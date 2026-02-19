@@ -287,7 +287,7 @@ export async function POST(req: Request) {
 
     const effectiveComments = applyCrawlPlanToComments(crawl.comments, crawlPlan);
     const nowIso = new Date().toISOString();
-    const documentRows = effectiveComments.map((c) => {
+    const rawDocumentRows = effectiveComments.map((c) => {
       const masked = maskPII(c.content);
       const spam = isProbableSpam(c.content, c.author, cfg.spamKeywordsCsv);
       return {
@@ -310,6 +310,17 @@ export async function POST(req: Request) {
         updated_at: nowIso,
       };
     });
+    const dedupedByExternalId = new Map<string, (typeof rawDocumentRows)[number]>();
+    for (const row of rawDocumentRows) {
+      const ext = String(row.external_id || "").trim();
+      if (!ext) continue;
+      if (!dedupedByExternalId.has(ext)) {
+        dedupedByExternalId.set(ext, row);
+      }
+    }
+    const documentRows = [...dedupedByExternalId.values()];
+    const uniqueExternalIds = dedupedByExternalId.size;
+    const dedupDropped = Math.max(0, rawDocumentRows.length - uniqueExternalIds);
 
     if (documentRows.length) {
       await upsertDocuments(documentRows);
@@ -361,14 +372,18 @@ export async function POST(req: Request) {
       }
     }
 
-    await upsertCrawlState({
-      sourceUrl: cfg.sourceUrl,
-      crawlScope: cfg.crawlScope,
-      sortMode: cfg.sortMode,
-      lastCrawledAt: maxPublishedIso(documentRows),
-      lastCursor: crawl.report.lastCursor || null,
-      lastRunStatus: "ok",
-    });
+    if (documentRows.length || state?.last_crawled_at) {
+      await upsertCrawlState({
+        sourceUrl: cfg.sourceUrl,
+        crawlScope: cfg.crawlScope,
+        sortMode: cfg.sortMode,
+        lastCrawledAt: documentRows.length
+          ? maxPublishedIso(documentRows)
+          : new Date(String(state?.last_crawled_at)).toISOString(),
+        lastCursor: crawl.report.lastCursor || null,
+        lastRunStatus: "ok",
+      });
+    }
 
     let queryEmbeddingLiteral = "";
     try {
@@ -454,6 +469,8 @@ export async function POST(req: Request) {
         pagesScanned: crawl.report.pagesScanned,
         commentsFound: crawl.report.commentsFound,
         commentsKept: documentRows.length,
+        uniqueExternalIds,
+        externalIdDedupDropped: dedupDropped,
         storedDocs: storedDocs.length,
         embeddedDocs,
         embeddingSkippedUnchanged: embedCandidates.length - toEmbed.length,
