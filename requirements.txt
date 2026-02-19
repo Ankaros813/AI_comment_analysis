@@ -1,0 +1,10 @@
+streamlit>=1.43.0
+requests>=2.32.0
+beautifulsoup4>=4.12.0
+python-dotenv>=1.0.1
+python-dateutil>=2.9.0
+supabase>=2.12.0
+numpy>=1.26.0
+pandas>=2.2.0
+# Optional (dynamic crawl mode):
+# playwright>=1.52.0
