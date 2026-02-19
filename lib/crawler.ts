@@ -593,6 +593,7 @@ function extractFromHtml(
   cfg: RuntimeConfig,
   sinceDate: Date | null,
   seenExternalIds: Set<string>,
+  nextSelectorOverride?: string,
 ): { comments: CrawledComment[]; found: number; nextLinks: string[] } {
   const $ = cheerio.load(html);
   const nodes = $(cfg.commentSelector);
@@ -653,8 +654,9 @@ function extractFromHtml(
   });
 
   const nextLinks: string[] = [];
-  if (cfg.nextPageSelector) {
-    $(cfg.nextPageSelector).each((_, el) => {
+  const nextSelector = (nextSelectorOverride || cfg.nextPageSelector || "").trim();
+  if (nextSelector) {
+    $(nextSelector).each((_, el) => {
       const href = $(el).attr("href");
       if (!href) return;
       try {
@@ -664,6 +666,86 @@ function extractFromHtml(
     });
   }
   return { comments, found, nextLinks };
+}
+
+function splitCsv(raw: string): string[] {
+  return (raw || "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function compileSafeRegex(raw: string): RegExp | null {
+  const text = (raw || "").trim();
+  if (!text) return null;
+  try {
+    return new RegExp(text, "i");
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyHttpUrl(href: string): boolean {
+  return /^https?:\/\//i.test(href);
+}
+
+function shouldKeepPostUrl(url: string, cfg: RuntimeConfig, postRegex: RegExp | null, includes: string[]): boolean {
+  if (!isSameDomain(cfg.sourceUrl, url)) return false;
+  if (includes.length) {
+    const low = url.toLowerCase();
+    const ok = includes.some((kw) => low.includes(kw.toLowerCase()));
+    if (!ok) return false;
+  }
+  if (postRegex && !postRegex.test(url)) return false;
+  return true;
+}
+
+function extractPostLinksFromListHtml(
+  html: string,
+  listPageUrl: string,
+  cfg: RuntimeConfig,
+  postRegex: RegExp | null,
+  includes: string[],
+): { postUrls: string[]; nextListUrls: string[] } {
+  const $ = cheerio.load(html);
+  const postUrls: string[] = [];
+  const seenPost = new Set<string>();
+  const linkSelector = (cfg.postLinkSelector || "").trim();
+
+  if (linkSelector) {
+    $(linkSelector).each((_, el) => {
+      const href = ($(el).attr("href") || "").trim();
+      if (!href || href.startsWith("#") || href.toLowerCase().startsWith("javascript:")) return;
+      try {
+        const abs = new URL(href, listPageUrl).toString();
+        if (!isLikelyHttpUrl(abs)) return;
+        if (!shouldKeepPostUrl(abs, cfg, postRegex, includes)) return;
+        if (!seenPost.has(abs)) {
+          seenPost.add(abs);
+          postUrls.push(abs);
+        }
+      } catch {}
+    });
+  }
+
+  const nextListUrls: string[] = [];
+  const seenNext = new Set<string>();
+  const nextSel = (cfg.listNextPageSelector || cfg.nextPageSelector || "").trim();
+  if (nextSel) {
+    $(nextSel).each((_, el) => {
+      const href = ($(el).attr("href") || "").trim();
+      if (!href) return;
+      try {
+        const abs = new URL(href, listPageUrl).toString();
+        if (!isSameDomain(cfg.sourceUrl, abs)) return;
+        if (!seenNext.has(abs)) {
+          seenNext.add(abs);
+          nextListUrls.push(abs);
+        }
+      } catch {}
+    });
+  }
+  return { postUrls, nextListUrls };
 }
 
 async function crawlStatic(
@@ -724,6 +806,119 @@ async function crawlStatic(
         commentsFound > 0
           ? ""
           : `댓글 노드를 찾지 못했습니다. commentSelector="${cfg.commentSelector}"`,
+      lastCursor: null,
+    },
+  };
+}
+
+async function crawlStaticListToPosts(
+  cfg: RuntimeConfig,
+  sinceDate: Date | null,
+): Promise<{ comments: CrawledComment[]; report: CrawlReport }> {
+  const headers = headersFromConfig(cfg);
+  const postRegex = compileSafeRegex(cfg.postUrlRegex);
+  const includes = splitCsv(cfg.postUrlIncludes);
+  const seenExternalIds = new Set<string>();
+
+  const listVisited = new Set<string>();
+  const selectedPostUrls: string[] = [];
+  const selectedPostSet = new Set<string>();
+  const notes: string[] = [];
+  let pagesScanned = 0;
+  let commentsFound = 0;
+
+  const listQueue: string[] = cfg.pageParamName
+    ? Array.from({ length: cfg.maxPages }, (_, i) => setPageParam(cfg.sourceUrl, cfg.pageParamName, cfg.pageStart + i))
+    : [cfg.sourceUrl];
+
+  while (listQueue.length && listVisited.size < cfg.maxPages && selectedPostUrls.length < cfg.maxPosts) {
+    const listPageUrl = listQueue.shift() as string;
+    if (listVisited.has(listPageUrl)) continue;
+    listVisited.add(listPageUrl);
+    pagesScanned += 1;
+
+    const res = await fetchWithRetry(
+      listPageUrl,
+      { method: "GET", headers },
+      cfg.maxRetries,
+      cfg.retryBackoffSec,
+    );
+    if (!res || res.status >= 400) {
+      notes.push(`목록 페이지 요청 실패: ${listPageUrl}`);
+      continue;
+    }
+    const html = await res.text();
+    const { postUrls, nextListUrls } = extractPostLinksFromListHtml(html, listPageUrl, cfg, postRegex, includes);
+
+    for (const postUrl of postUrls) {
+      if (selectedPostSet.has(postUrl)) continue;
+      selectedPostSet.add(postUrl);
+      selectedPostUrls.push(postUrl);
+      if (selectedPostUrls.length >= cfg.maxPosts) break;
+    }
+
+    for (const nextListUrl of nextListUrls) {
+      if (!listVisited.has(nextListUrl)) listQueue.push(nextListUrl);
+    }
+
+    if (cfg.requestDelaySec > 0) {
+      await sleep(Math.floor(cfg.requestDelaySec * 1000));
+    }
+  }
+
+  const comments: CrawledComment[] = [];
+  for (const postUrl of selectedPostUrls) {
+    const commentVisited = new Set<string>();
+    const commentQueue: string[] = [postUrl];
+
+    while (commentQueue.length && commentVisited.size < cfg.maxCommentPagesPerPost) {
+      const pageUrl = commentQueue.shift() as string;
+      if (commentVisited.has(pageUrl)) continue;
+      commentVisited.add(pageUrl);
+      pagesScanned += 1;
+
+      const res = await fetchWithRetry(
+        pageUrl,
+        { method: "GET", headers },
+        cfg.maxRetries,
+        cfg.retryBackoffSec,
+      );
+      if (!res || res.status >= 400) continue;
+      const html = await res.text();
+      const { comments: extracted, found, nextLinks } = extractFromHtml(
+        html,
+        pageUrl,
+        cfg,
+        sinceDate,
+        seenExternalIds,
+        cfg.commentNextPageSelector || cfg.nextPageSelector,
+      );
+      commentsFound += found;
+      comments.push(...extracted);
+
+      for (const nextUrl of nextLinks) {
+        if (!commentVisited.has(nextUrl)) commentQueue.push(nextUrl);
+      }
+      if (cfg.requestDelaySec > 0) {
+        await sleep(Math.floor(cfg.requestDelaySec * 1000));
+      }
+    }
+  }
+
+  if (!selectedPostUrls.length) {
+    notes.push(`게시글 링크를 찾지 못했습니다. postLinkSelector="${cfg.postLinkSelector}"`);
+  } else {
+    notes.push(`목록에서 게시글 ${selectedPostUrls.length}개를 수집해 댓글 페이지를 순회했습니다.`);
+  }
+
+  return {
+    comments,
+    report: {
+      pagesScanned,
+      commentsFound,
+      commentsKept: comments.length,
+      modeUsed: "static_list_posts",
+      notes: notes.join(" ").slice(0, 500),
       lastCursor: null,
     },
   };
@@ -882,6 +1077,17 @@ export async function crawlComments(
 
   if (cfg.crawlMode === "api_json") {
     const out = await crawlApiJson(cfg, sinceDate);
+    if (naverError) out.report.notes = `${naverError} | ${out.report.notes}`.slice(0, 500);
+    return out;
+  }
+  if (cfg.collectionMode === "list_to_posts") {
+    const out = await crawlStaticListToPosts(cfg, sinceDate);
+    if (cfg.crawlMode === "dynamic") {
+      out.report.notes = `dynamic mode is not supported on Vercel serverless. Fell back to static list mode. ${out.report.notes}`.slice(
+        0,
+        500,
+      );
+    }
     if (naverError) out.report.notes = `${naverError} | ${out.report.notes}`.slice(0, 500);
     return out;
   }

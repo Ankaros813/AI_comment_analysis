@@ -19,6 +19,11 @@
 - `naver article auto`: 네이버 기사 URL(`n.news.naver.com/article/...`)이면 서버가 자동으로
   네이버 댓글 API(JSONP)를 사용해 본댓글/대댓글/더보기 페이지를 순회 수집
 
+## Collection Mode
+- `single_page` (기본): 입력한 URL 페이지의 댓글만 수집
+- `list_to_posts`: 목록 페이지에서 게시글 링크를 모은 뒤 각 게시글로 들어가 댓글 수집
+  - 주요 필드: `postLinkSelector`, `listNextPageSelector`, `commentNextPageSelector`, `maxPosts`
+
 ## UI 주요 입력
 - 크롤링 URL 입력란
 - 네이버 뉴스 자동설정 버튼

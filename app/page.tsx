@@ -48,14 +48,22 @@ const DEFAULT_FORM = {
   modelName: "openai/gpt-4o-mini-2024-07-18",
   usePaidEmbedding: false,
   crawlMode: "static",
+  collectionMode: "single_page",
   crawlScope: "default",
   sortMode: "latest",
   lookbackHours: 24,
   maxPages: 8,
+  maxPosts: 40,
+  maxCommentPagesPerPost: 3,
   commentSelector: ".comment, .reply, [data-comment-id], li[class*='comment']",
   authorSelector: ".author, .user, .nickname, [class*='writer']",
   datetimeSelector: "time, .date, .time, [class*='date']",
   nextPageSelector: "a[rel='next'], .next a, a.next",
+  listNextPageSelector: "a[rel='next'], .next a, a.next, .btn_next",
+  commentNextPageSelector: "a[rel='next'], .next a, a.next",
+  postLinkSelector: "a[href*='/board/view'], a[href*='/article/'], a[href*='/post/'], a[href*='view?']",
+  postUrlIncludes: "",
+  postUrlRegex: "",
   apiEndpoint: "",
   apiMethod: "GET",
   apiCommentsPath: "data.comments",
@@ -145,6 +153,7 @@ export default function HomePage() {
     setForm((s) => ({
       ...s,
       crawlMode: "api_json",
+      collectionMode: "single_page",
       sortMode: "popular",
       maxPages: Number(s.maxPages || 8),
       apiEndpoint: "https://apis.naver.com/commentBox/cbox5/web_naver_list_jsonp.json",
@@ -267,6 +276,32 @@ export default function HomePage() {
               </div>
             </div>
 
+            <div className="row-2">
+              <div className="field">
+                <label>Collection Mode</label>
+                <select
+                  value={String(form.collectionMode || "single_page")}
+                  onChange={(e) => setForm((s) => ({ ...s, collectionMode: e.target.value }))}
+                >
+                  <option value="single_page">single_page (기본)</option>
+                  <option value="list_to_posts">list_to_posts (목록→게시글→댓글)</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>Max Posts (list mode)</label>
+                <input
+                  type="number"
+                  value={Number(form.maxPosts || 40)}
+                  onChange={(e) => setForm((s) => ({ ...s, maxPosts: Number(e.target.value) }))}
+                />
+              </div>
+            </div>
+            {String(form.collectionMode || "single_page") === "list_to_posts" ? (
+              <p className="muted">
+                목록 페이지에서 게시글 링크를 수집한 뒤, 각 게시글에 들어가 댓글을 모읍니다.
+              </p>
+            ) : null}
+
             <div className="field">
               <label>User Tier</label>
               <div className="tier-row">
@@ -351,6 +386,17 @@ export default function HomePage() {
               </div>
             </div>
 
+            <div className="row-2">
+              <div className="field">
+                <label>Comment Pages/Post (list mode)</label>
+                <input
+                  type="number"
+                  value={Number(form.maxCommentPagesPerPost || 3)}
+                  onChange={(e) => setForm((s) => ({ ...s, maxCommentPagesPerPost: Number(e.target.value) }))}
+                />
+              </div>
+            </div>
+
             <details>
               <summary>HTML Selectors</summary>
               <div className="field">
@@ -379,6 +425,43 @@ export default function HomePage() {
                 <input
                   value={String(form.nextPageSelector || "")}
                   onChange={(e) => setForm((s) => ({ ...s, nextPageSelector: e.target.value }))}
+                />
+              </div>
+              <div className="field">
+                <label>List Next Page Selector (list mode)</label>
+                <input
+                  value={String(form.listNextPageSelector || "")}
+                  onChange={(e) => setForm((s) => ({ ...s, listNextPageSelector: e.target.value }))}
+                />
+              </div>
+              <div className="field">
+                <label>Comment Next Page Selector (list mode)</label>
+                <input
+                  value={String(form.commentNextPageSelector || "")}
+                  onChange={(e) => setForm((s) => ({ ...s, commentNextPageSelector: e.target.value }))}
+                />
+              </div>
+              <div className="field">
+                <label>Post Link Selector (list mode)</label>
+                <input
+                  value={String(form.postLinkSelector || "")}
+                  onChange={(e) => setForm((s) => ({ ...s, postLinkSelector: e.target.value }))}
+                />
+              </div>
+              <div className="field">
+                <label>Post URL Includes (comma-separated)</label>
+                <input
+                  value={String(form.postUrlIncludes || "")}
+                  onChange={(e) => setForm((s) => ({ ...s, postUrlIncludes: e.target.value }))}
+                  placeholder="/board/view,/article/"
+                />
+              </div>
+              <div className="field">
+                <label>Post URL Regex (optional)</label>
+                <input
+                  value={String(form.postUrlRegex || "")}
+                  onChange={(e) => setForm((s) => ({ ...s, postUrlRegex: e.target.value }))}
+                  placeholder="\\/board\\/view\\/"
                 />
               </div>
             </details>

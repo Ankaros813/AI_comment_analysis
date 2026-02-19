@@ -11,16 +11,21 @@ export interface AnalyzeRequest {
   embeddingProvider?: EmbeddingProvider;
   usePaidEmbedding?: boolean;
   crawlMode?: CrawlMode;
+  collectionMode?: "single_page" | "list_to_posts";
   crawlScope?: string;
   sortMode?: string;
   lookbackHours?: number;
   maxPages?: number;
+  maxPosts?: number;
+  maxCommentPagesPerPost?: number;
 
   commentSelector?: string;
   authorSelector?: string;
   datetimeSelector?: string;
   parentSelector?: string;
   nextPageSelector?: string;
+  listNextPageSelector?: string;
+  commentNextPageSelector?: string;
   commentIdAttr?: string;
   parentIdAttr?: string;
   deletedSelector?: string;
@@ -28,6 +33,9 @@ export interface AnalyzeRequest {
   minCommentLength?: number;
   pageParamName?: string;
   pageStart?: number;
+  postLinkSelector?: string;
+  postUrlIncludes?: string;
+  postUrlRegex?: string;
 
   apiEndpoint?: string;
   apiMethod?: "GET" | "POST";
@@ -67,16 +75,21 @@ export interface RuntimeConfig {
   modelName: string;
   embeddingProvider: EmbeddingProvider;
   crawlMode: CrawlMode;
+  collectionMode: "single_page" | "list_to_posts";
   crawlScope: string;
   sortMode: string;
   lookbackHours: number;
   maxPages: number;
+  maxPosts: number;
+  maxCommentPagesPerPost: number;
 
   commentSelector: string;
   authorSelector: string;
   datetimeSelector: string;
   parentSelector: string;
   nextPageSelector: string;
+  listNextPageSelector: string;
+  commentNextPageSelector: string;
   commentIdAttr: string;
   parentIdAttr: string;
   deletedSelector: string;
@@ -84,6 +97,9 @@ export interface RuntimeConfig {
   minCommentLength: number;
   pageParamName: string;
   pageStart: number;
+  postLinkSelector: string;
+  postUrlIncludes: string;
+  postUrlRegex: string;
 
   apiEndpoint: string;
   apiMethod: "GET" | "POST";

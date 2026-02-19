@@ -69,10 +69,13 @@ function buildConfig(body: AnalyzeRequest): RuntimeConfig {
     modelName: trimOrDefault(body.modelName, "openai/gpt-4o-mini-2024-07-18"),
     embeddingProvider,
     crawlMode: body.crawlMode || "static",
+    collectionMode: body.collectionMode === "list_to_posts" ? "list_to_posts" : "single_page",
     crawlScope: (body.crawlScope || "default").trim(),
     sortMode: (body.sortMode || "latest").trim(),
     lookbackHours: toInt(body.lookbackHours, 24),
     maxPages: Math.max(1, Math.min(100, toInt(body.maxPages, 8))),
+    maxPosts: Math.max(1, Math.min(500, toInt(body.maxPosts, 40))),
+    maxCommentPagesPerPost: Math.max(1, Math.min(30, toInt(body.maxCommentPagesPerPost, 3))),
 
     commentSelector:
       (body.commentSelector || ".comment, .reply, [data-comment-id], li[class*='comment']").trim(),
@@ -80,6 +83,10 @@ function buildConfig(body: AnalyzeRequest): RuntimeConfig {
     datetimeSelector: (body.datetimeSelector || "time, .date, .time, [class*='date']").trim(),
     parentSelector: (body.parentSelector || "").trim(),
     nextPageSelector: (body.nextPageSelector || "a[rel='next'], .next a, a.next").trim(),
+    listNextPageSelector:
+      (body.listNextPageSelector || body.nextPageSelector || "a[rel='next'], .next a, a.next, .btn_next").trim(),
+    commentNextPageSelector:
+      (body.commentNextPageSelector || body.nextPageSelector || "a[rel='next'], .next a, a.next").trim(),
     commentIdAttr: (body.commentIdAttr || "data-comment-id").trim(),
     parentIdAttr: (body.parentIdAttr || "data-parent-id").trim(),
     deletedSelector: (body.deletedSelector || "").trim(),
@@ -88,6 +95,11 @@ function buildConfig(body: AnalyzeRequest): RuntimeConfig {
     minCommentLength: Math.max(0, Math.min(100, toInt(body.minCommentLength, 2))),
     pageParamName: (body.pageParamName || "").trim(),
     pageStart: Math.max(1, toInt(body.pageStart, 1)),
+    postLinkSelector:
+      (body.postLinkSelector ||
+        "a[href*='/board/view'], a[href*='/article/'], a[href*='/post/'], a[href*='view?']").trim(),
+    postUrlIncludes: (body.postUrlIncludes || "").trim(),
+    postUrlRegex: (body.postUrlRegex || "").trim(),
 
     apiEndpoint: (body.apiEndpoint || "").trim(),
     apiMethod: body.apiMethod || "GET",
@@ -147,6 +159,10 @@ function buildNoDataMessage(cfg: RuntimeConfig, crawlNotes: string): string {
     "- `HTML Selectors`가 실제 댓글 DOM 구조와 불일치",
     "- 로그인/쿠키/헤더가 필요한 댓글 API 구조",
   ];
+
+  if (cfg.collectionMode === "list_to_posts") {
+    lines.push("- 목록 모드에서 게시글 링크 selector/post URL 필터가 실제 구조와 맞지 않을 수 있음");
+  }
 
   if (crawlNotes) {
     lines.push("", "## 크롤링 노트", `- ${crawlNotes}`);
