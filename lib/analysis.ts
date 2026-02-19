@@ -93,8 +93,21 @@ function toValidDateOrNull(v: unknown): string | null {
   if (typeof v !== "string" || !v.trim()) return null;
   const t = v.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
-  const d = new Date(`${t}T00:00:00Z`);
-  return Number.isNaN(d.getTime()) ? null : t;
+  const [yRaw, mRaw, dRaw] = t.split("-");
+  const y = Number(yRaw);
+  const m = Number(mRaw);
+  const d = Number(dRaw);
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (
+    Number.isNaN(dt.getTime()) ||
+    dt.getUTCFullYear() !== y ||
+    dt.getUTCMonth() !== m - 1 ||
+    dt.getUTCDate() !== d
+  ) {
+    return null;
+  }
+  return t;
 }
 
 function toNumberOrNull(v: unknown, min: number, max: number): number | null {

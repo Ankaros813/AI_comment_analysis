@@ -203,8 +203,19 @@ function applyCrawlPlanToComments(
 
   let rows = [...comments];
 
-  const startTs = plan.startDate ? Date.parse(`${plan.startDate}T00:00:00Z`) : NaN;
-  const endTs = plan.endDate ? Date.parse(`${plan.endDate}T23:59:59Z`) : NaN;
+  let startTs = plan.startDate ? Date.parse(`${plan.startDate}T00:00:00Z`) : NaN;
+  let endTs = plan.endDate ? Date.parse(`${plan.endDate}T23:59:59Z`) : NaN;
+  const nowTs = Date.now();
+
+  // Guard against planner-produced future dates that would filter out all current comments.
+  if (!Number.isNaN(startTs) && startTs > nowTs) startTs = NaN;
+  if (!Number.isNaN(endTs) && endTs > nowTs) endTs = nowTs;
+  if (!Number.isNaN(startTs) && !Number.isNaN(endTs) && startTs > endTs) {
+    const tmp = startTs;
+    startTs = endTs;
+    endTs = tmp;
+  }
+
   if (!Number.isNaN(startTs) || !Number.isNaN(endTs)) {
     rows = rows.filter((row) => {
       if (!row.published_at) return true;
