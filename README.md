@@ -6,7 +6,7 @@
 - Frontend/App: Next.js (`app/page.tsx`)
 - Backend API: Next.js Route Handler (`app/api/analyze/route.ts`)
 - DB: Supabase (`documents`, `comment_embeddings`, `crawl_state`)
-- LLM: OpenRouter (`openai/gpt-oss-120b:free` 기본)
+- LLM: OpenRouter (`openai/gpt-4o-mini-2024-07-18` 기본)
 - 비용 최적화:
   - 임베딩은 로컬 해시(무료)
   - 변경된 문서만 재임베딩

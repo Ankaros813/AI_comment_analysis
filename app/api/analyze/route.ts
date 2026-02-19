@@ -66,7 +66,7 @@ function buildConfig(body: AnalyzeRequest): RuntimeConfig {
     userQuery: trimOrDefault(body.userQuery, DEFAULT_RAG_PROMPT),
     userTier,
     crawlTargetInstruction: trimOrDefault(body.crawlTargetInstruction, ""),
-    modelName: trimOrDefault(body.modelName, "openai/gpt-oss-120b:free"),
+    modelName: trimOrDefault(body.modelName, "openai/gpt-4o-mini-2024-07-18"),
     embeddingProvider,
     crawlMode: body.crawlMode || "static",
     crawlScope: (body.crawlScope || "default").trim(),

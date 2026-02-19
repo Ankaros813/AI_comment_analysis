@@ -8,7 +8,7 @@ from typing import Optional
 from dotenv import load_dotenv
 
 
-DEFAULT_LLM_MODEL = "openai/gpt-oss-120b:free"
+DEFAULT_LLM_MODEL = "openai/gpt-4o-mini-2024-07-18"
 DEFAULT_CRAWL_MODE = "static"  # static | dynamic | api_json
 DEFAULT_COMMENT_SELECTOR = ".comment, .reply, [data-comment-id], li[class*='comment']"
 DEFAULT_AUTHOR_SELECTOR = ".author, .user, .nickname, [class*='writer']"

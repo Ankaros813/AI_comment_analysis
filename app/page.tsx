@@ -45,7 +45,7 @@ const DEFAULT_FORM = {
   sourceUrl: "",
   userQuery: "",
   crawlTargetInstruction: "",
-  modelName: "openai/gpt-oss-120b:free",
+  modelName: "openai/gpt-4o-mini-2024-07-18",
   usePaidEmbedding: false,
   crawlMode: "static",
   crawlScope: "default",
