@@ -43,7 +43,7 @@ type AnalyzeResponse = {
 
 const DEFAULT_FORM = {
   sourceUrl: "",
-  userQuery: "최근 댓글의 민심과 리스크, 7일 실행 액션을 정리해줘.",
+  userQuery: "",
   crawlTargetInstruction: "",
   modelName: "openai/gpt-oss-120b:free",
   usePaidEmbedding: false,
@@ -74,7 +74,11 @@ export default function HomePage() {
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [progress, setProgress] = useState(0);
 
-  const canSubmit = useMemo(() => String(form.sourceUrl || "").trim().length > 0, [form.sourceUrl]);
+  const canSubmit = useMemo(() => {
+    const hasSourceUrl = String(form.sourceUrl || "").trim().length > 0;
+    const hasCrawlInstruction = String(form.crawlTargetInstruction || "").trim().length > 0;
+    return hasSourceUrl && hasCrawlInstruction;
+  }, [form.sourceUrl, form.crawlTargetInstruction]);
 
   useEffect(() => {
     if (!loading) return;
@@ -130,19 +134,50 @@ export default function HomePage() {
 
   return (
     <main className="page">
-      <div className="container">
-        <section className="hero">
-          <h1>Real-time AI Comment Analyzer (Vercel)</h1>
-          <p>
-            Vercel + Supabase + OpenRouter 기반 실시간 댓글 분석 앱입니다. 크롤링 URL, 수집조건 자연어 지시, 분석
-            프롬프트를 함께 입력할 수 있습니다.
-          </p>
+      <div className="container">        <section className="hero">
+          <div className="hero-logo" aria-hidden="true">
+            <svg className="hero-logo-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="heroBg" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#021027" />
+                  <stop offset="100%" stopColor="#001b42" />
+                </linearGradient>
+                <linearGradient id="heroIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#63d2ff" />
+                  <stop offset="100%" stopColor="#38bdf8" />
+                </linearGradient>
+              </defs>
+              <rect x="1" y="1" width="118" height="118" rx="24" fill="url(#heroBg)" />
+              <path
+                d="M30 46c0-5 4-9 9-9h38c5 0 9 4 9 9v26c0 5-4 9-9 9H55l-9 8c-2 2-5 0-5-2v-6h-2c-5 0-9-4-9-9V46z"
+                fill="url(#heroIcon)"
+              />
+              <rect x="41" y="53" width="12" height="4" rx="2" fill="#ffffff" />
+              <rect x="56" y="53" width="18" height="4" rx="2" fill="#ffffff" />
+              <rect x="41" y="62" width="16" height="4" rx="2" fill="#ffffff" />
+              <polygon points="76,28 81,31 81,37 76,40 71,37 71,31" fill="url(#heroIcon)" />
+              <polygon points="84,36 89,39 89,45 84,48 79,45 79,39" fill="url(#heroIcon)" />
+              <polygon points="68,36 73,39 73,45 68,48 63,45 63,39" fill="url(#heroIcon)" />
+            </svg>
+          </div>
+          <div className="hero-copy">
+            <h1>실시간 AI 댓글 분석기</h1>
+            <p>
+              Vercel + Supabase + OpenRouter 기반으로 실시간 댓글을 빠르게 수집하고 분석합니다. 크롤링 URL, 수집 조건
+              자연어 지시, 분석 프롬프트를 입력해 실행할 수 있습니다.
+            </p>
+          </div>
         </section>
 
         <div className="grid">
           <form className="panel" onSubmit={onSubmit}>
             <div className="field">
-              <label>크롤링 URL (데이터 수집 대상 페이지)</label>
+              <label>
+                <span className="required-star" aria-hidden="true">
+                  *
+                </span>{" "}
+                크롤링 URL (데이터 수집 대상 페이지)
+              </label>
               <input
                 value={String(form.sourceUrl || "")}
                 onChange={(e) => setForm((s) => ({ ...s, sourceUrl: e.target.value }))}
@@ -151,7 +186,12 @@ export default function HomePage() {
             </div>
 
             <div className="field">
-              <label>댓글 수집 조건 자연어 지시</label>
+              <label>
+                <span className="required-star" aria-hidden="true">
+                  *
+                </span>{" "}
+                댓글 수집 조건 자연어 지시
+              </label>
               <textarea
                 value={String(form.crawlTargetInstruction || "")}
                 onChange={(e) => setForm((s) => ({ ...s, crawlTargetInstruction: e.target.value }))}
@@ -167,7 +207,9 @@ export default function HomePage() {
               <textarea
                 value={String(form.userQuery || "")}
                 onChange={(e) => setForm((s) => ({ ...s, userQuery: e.target.value }))}
+                placeholder="(선택) 비워두면 기본 분석 프롬프트로 자동 실행됩니다."
               />
+              <p className="muted">입력하면 해당 프롬프트를 사용하고, 비우면 기본 프롬프트를 사용합니다.</p>
             </div>
 
             <div className="row-2">

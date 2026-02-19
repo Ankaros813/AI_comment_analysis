@@ -19,6 +19,9 @@ import type { AnalyzeRequest, CrawlInstructionPlan, CrawledComment, RuntimeConfi
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const DEFAULT_RAG_PROMPT =
+  "최신 댓글 흐름을 요약하고 핵심 이슈, 감성 분포, 리스크, 즉시 실행 가능한 액션 아이템을 제안해줘.";
+
 function requiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing env var: ${name}`);
@@ -44,6 +47,12 @@ function toBool(v: unknown, fallback: boolean): boolean {
   return fallback;
 }
 
+function trimOrDefault(v: unknown, fallback: string): string {
+  if (typeof v !== "string") return fallback;
+  const s = v.trim();
+  return s || fallback;
+}
+
 function buildConfig(body: AnalyzeRequest): RuntimeConfig {
   const userTier: RuntimeConfig["userTier"] = body.userTier === "pro" ? "pro" : "general";
   const providerRaw = String(body.embeddingProvider || "").trim().toLowerCase();
@@ -53,11 +62,11 @@ function buildConfig(body: AnalyzeRequest): RuntimeConfig {
   else if (toBool(body.usePaidEmbedding, false) && userTier === "pro") embeddingProvider = "openrouter";
 
   return {
-    sourceUrl: (body.sourceUrl || "").trim(),
-    userQuery: (body.userQuery || "Analyze latest comments and provide actions.").trim(),
+    sourceUrl: trimOrDefault(body.sourceUrl, ""),
+    userQuery: trimOrDefault(body.userQuery, DEFAULT_RAG_PROMPT),
     userTier,
-    crawlTargetInstruction: (body.crawlTargetInstruction || "").trim(),
-    modelName: (body.modelName || "openai/gpt-oss-120b:free").trim(),
+    crawlTargetInstruction: trimOrDefault(body.crawlTargetInstruction, ""),
+    modelName: trimOrDefault(body.modelName, "openai/gpt-oss-120b:free"),
     embeddingProvider,
     crawlMode: body.crawlMode || "static",
     crawlScope: (body.crawlScope || "default").trim(),
