@@ -16,9 +16,14 @@
 - `static`: 일반 HTML 댓글
 - `api_json`: 내부 API/XHR 댓글
 - `dynamic`: Vercel 서버리스에서 브라우저 자동화 제한이 있어 자동으로 `static` 폴백
+- `naver article auto`: 네이버 기사 URL(`n.news.naver.com/article/...`)이면 서버가 자동으로
+  네이버 댓글 API(JSONP)를 사용해 본댓글/대댓글/더보기 페이지를 순회 수집
 
 ## UI 주요 입력
 - 크롤링 URL 입력란
+- 네이버 뉴스 자동설정 버튼
+  - `api_json` 관련 필드 자동 주입
+  - 네이버 URL일 때는 서버가 전용 수집 경로로 처리
 - 댓글 수집 조건 자연어 지시 입력란
   - 날짜 기간, 목표 댓글 개수를 문장으로 입력
   - 해당 문장을 별도 LLM 호출로 해석하여 수집 필터에 반영

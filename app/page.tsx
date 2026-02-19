@@ -66,6 +66,15 @@ const DEFAULT_FORM = {
   piiMaskBeforeModel: true,
 };
 
+function isNaverNewsUrl(rawUrl: string): boolean {
+  try {
+    const u = new URL(rawUrl);
+    return /(^|\.)news\.naver\.com$/i.test(u.host) && /\/article(\/comment)?\//.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
 export default function HomePage() {
   const [form, setForm] = useState<Record<string, string | number | boolean>>(DEFAULT_FORM);
   const [userTier, setUserTier] = useState<"general" | "pro">("general");
@@ -132,6 +141,20 @@ export default function HomePage() {
     }
   };
 
+  const applyNaverPreset = () => {
+    setForm((s) => ({
+      ...s,
+      crawlMode: "api_json",
+      sortMode: "popular",
+      maxPages: Number(s.maxPages || 8),
+      apiEndpoint: "https://apis.naver.com/commentBox/cbox5/web_naver_list_jsonp.json",
+      apiMethod: "GET",
+      apiCommentsPath: "result.commentList",
+      apiHasMorePath: "result.morePage.next",
+      apiNextCursorPath: "result.morePage.next",
+    }));
+  };
+
   return (
     <main className="page">
       <div className="container">        <section className="hero">
@@ -183,6 +206,17 @@ export default function HomePage() {
                 onChange={(e) => setForm((s) => ({ ...s, sourceUrl: e.target.value }))}
                 placeholder="https://example.com/post/123"
               />
+              <div className="preset-row">
+                <button type="button" className="preset-btn" onClick={applyNaverPreset}>
+                  네이버 뉴스 자동설정
+                </button>
+                <span className="muted">
+                  네이버 뉴스 URL이면 api_json 전용 수집으로 본댓글/대댓글/더보기 구조를 자동 처리합니다.
+                </span>
+              </div>
+              {isNaverNewsUrl(String(form.sourceUrl || "")) ? (
+                <p className="muted">네이버 기사 URL 감지됨: static 대신 api_json 모드 권장</p>
+              ) : null}
             </div>
 
             <div className="field">
