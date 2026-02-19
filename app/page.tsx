@@ -264,7 +264,12 @@ export default function HomePage() {
                 />
               </div>
               <div className="field">
-                <label>Crawl Mode</label>
+                <label>
+                  <span className="required-star" aria-hidden="true">
+                    *
+                  </span>{" "}
+                  Crawl Mode
+                </label>
                 <select
                   value={String(form.crawlMode || "static")}
                   onChange={(e) => setForm((s) => ({ ...s, crawlMode: e.target.value }))}
@@ -278,7 +283,12 @@ export default function HomePage() {
 
             <div className="row-2">
               <div className="field">
-                <label>Collection Mode</label>
+                <label>
+                  <span className="required-star" aria-hidden="true">
+                    *
+                  </span>{" "}
+                  Collection Mode
+                </label>
                 <select
                   value={String(form.collectionMode || "single_page")}
                   onChange={(e) => setForm((s) => ({ ...s, collectionMode: e.target.value }))}
