@@ -207,7 +207,7 @@ export default function HomePage() {
               <textarea
                 value={String(form.userQuery || "")}
                 onChange={(e) => setForm((s) => ({ ...s, userQuery: e.target.value }))}
-                placeholder="(선택) 비워두면 기본 분석 프롬프트로 자동 실행됩니다."
+                placeholder="예: 최근 댓글의 민심과 핵심 이슈, 리스크, 7일 실행 액션을 정리해줘."
               />
               <p className="muted">입력하면 해당 프롬프트를 사용하고, 비우면 기본 프롬프트를 사용합니다.</p>
             </div>
