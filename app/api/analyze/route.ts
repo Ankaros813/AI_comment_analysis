@@ -33,6 +33,14 @@ function toInt(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
+function toOptionalInt(v: unknown): number | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v === "string" && !v.trim()) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.trunc(n);
+}
+
 function toNum(v: unknown, fallback: number): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -258,7 +266,9 @@ export async function POST(req: Request) {
 
     const openrouterKey = requiredEnv("OPENROUTER_HACKERTHON_API_KEY");
     const embeddingModelName = (process.env.COMMENT_EMBEDDING_MODEL || "openai/text-embedding-3-small").trim();
-    const embeddingDim = Math.max(1, Math.min(8192, toInt(process.env.COMMENT_EMBEDDING_DIM, 1536)));
+    const providerDefaultDim = cfg.embeddingProvider === "openrouter" ? 1536 : 384;
+    const envEmbeddingDim = toOptionalInt(process.env.COMMENT_EMBEDDING_DIM);
+    const embeddingDim = Math.max(1, Math.min(8192, envEmbeddingDim ?? providerDefaultDim));
     const embeddingModelLabel =
       cfg.embeddingProvider === "openrouter" ? embeddingModelName : `local-hash-${embeddingDim}`;
     const topK = toInt(process.env.COMMENT_TOP_K, 24);
