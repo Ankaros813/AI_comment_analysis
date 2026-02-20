@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -9,6 +9,7 @@ type AnalyzeResponse = {
     adjustedSinceDt: string | null;
     pagesScanned: number;
     commentsFound: number;
+    commentsFoundRaw?: number;
     commentsKept: number;
     uniqueExternalIds?: number;
     externalIdDedupDropped?: number;
@@ -49,7 +50,7 @@ const DEFAULT_FORM = {
   crawlTargetInstruction: "",
   modelName: "openai/gpt-4o-mini-2024-07-18",
   usePaidEmbedding: false,
-  crawlMode: "static",
+  crawlMode: "auto",
   collectionMode: "single_page",
   crawlScope: "default",
   sortMode: "latest",
@@ -95,9 +96,8 @@ export default function HomePage() {
 
   const canSubmit = useMemo(() => {
     const hasSourceUrl = String(form.sourceUrl || "").trim().length > 0;
-    const hasCrawlInstruction = String(form.crawlTargetInstruction || "").trim().length > 0;
-    return hasSourceUrl && hasCrawlInstruction;
-  }, [form.sourceUrl, form.crawlTargetInstruction]);
+    return hasSourceUrl;
+  }, [form.sourceUrl]);
 
   useEffect(() => {
     if (!loading) return;
@@ -154,7 +154,6 @@ export default function HomePage() {
   const applyNaverPreset = () => {
     setForm((s) => ({
       ...s,
-      crawlMode: "api_json",
       collectionMode: "single_page",
       sortMode: "popular",
       maxPages: Number(s.maxPages || 8),
@@ -195,10 +194,10 @@ export default function HomePage() {
             </svg>
           </div>
           <div className="hero-copy">
-            <h1>실시간 AI 댓글 분석기</h1>
+            <h1>Realtime AI Comment Analyzer</h1>
             <p>
-              Vercel + Supabase + OpenRouter 기반으로 실시간 댓글을 빠르게 수집하고 분석합니다. 크롤링 URL, 수집 조건
-              자연어 지시, 분석 프롬프트를 입력해 실행할 수 있습니다.
+              Vercel + Supabase + OpenRouter 湲곕컲?쇰줈 ?ㅼ떆媛??볤???鍮좊Ⅴ寃??섏쭛?섍퀬 遺꾩꽍?⑸땲?? ?щ·留?URL, ?섏쭛 議곌굔
+              ?먯뿰??吏?? 遺꾩꽍 ?꾨＼?꾪듃瑜??낅젰???ㅽ뻾?????덉뒿?덈떎.
             </p>
           </div>
         </section>
@@ -210,7 +209,7 @@ export default function HomePage() {
                 <span className="required-star" aria-hidden="true">
                   *
                 </span>{" "}
-                크롤링 URL (데이터 수집 대상 페이지)
+                Source URL
               </label>
               <input
                 value={String(form.sourceUrl || "")}
@@ -219,69 +218,50 @@ export default function HomePage() {
               />
               <div className="preset-row">
                 <button type="button" className="preset-btn" onClick={applyNaverPreset}>
-                  네이버 뉴스 자동설정
+                  Naver Preset
                 </button>
                 <span className="muted">
-                  네이버 뉴스 URL이면 api_json 전용 수집으로 본댓글/대댓글/더보기 구조를 자동 처리합니다.
+                  For Naver news URLs, auto crawl prioritizes the Naver comment API.
                 </span>
               </div>
               {isNaverNewsUrl(String(form.sourceUrl || "")) ? (
-                <p className="muted">네이버 기사 URL 감지됨: static 대신 api_json 모드 권장</p>
+                <p className="muted">Naver URL detected: auto crawl will try platform API first.</p>
               ) : null}
             </div>
 
             <div className="field">
-              <label>
-                <span className="required-star" aria-hidden="true">
-                  *
-                </span>{" "}
-                댓글 수집 조건 자연어 지시
-              </label>
+              <label>Crawl Instruction (optional)</label>
               <textarea
                 value={String(form.crawlTargetInstruction || "")}
                 onChange={(e) => setForm((s) => ({ ...s, crawlTargetInstruction: e.target.value }))}
-                placeholder="예: 최근 14일 댓글 중심으로 최신순 300개를 수집해서 분석해줘."
+                placeholder="Example: collect up to 300 recent comments and analyze trend/risk."
               />
-              <p className="important-note">
-                분석 대상 댓글의 기간 범위와 목표 댓글 수를 구체적으로 작성해 주세요. 예: 최근 30일, 최신순 500개 중심
-              </p>
             </div>
 
             <div className="field">
-              <label>RAG 분석 프롬프트</label>
+              <label>RAG Prompt</label>
               <textarea
                 value={String(form.userQuery || "")}
                 onChange={(e) => setForm((s) => ({ ...s, userQuery: e.target.value }))}
-                placeholder="예: 최근 댓글의 민심과 핵심 이슈, 리스크, 7일 실행 액션을 정리해줘."
+                placeholder="Example: summarize sentiment, top issues, and immediate actions."
               />
-              <p className="muted">입력하면 해당 프롬프트를 사용하고, 비우면 기본 프롬프트를 사용합니다.</p>
             </div>
 
-            <div className="row-2">
-              <div className="field">
-                <label>Model</label>
-                <input
-                  value={String(form.modelName || "")}
-                  onChange={(e) => setForm((s) => ({ ...s, modelName: e.target.value }))}
-                />
-              </div>
-              <div className="field">
-                <label>
-                  <span className="required-star" aria-hidden="true">
-                    *
-                  </span>{" "}
-                  Crawl Mode
-                </label>
-                <select
-                  value={String(form.crawlMode || "static")}
-                  onChange={(e) => setForm((s) => ({ ...s, crawlMode: e.target.value }))}
-                >
-                  <option value="static">static</option>
-                  <option value="dynamic">dynamic (fallback on Vercel)</option>
-                  <option value="api_json">api_json</option>
-                </select>
-              </div>
+            <div className="field">
+              <label>Model</label>
+              <input
+                value={String(form.modelName || "")}
+                onChange={(e) => setForm((s) => ({ ...s, modelName: e.target.value }))}
+              />
             </div>
+            <p className="muted">
+              Crawl mode is fixed to <code>auto</code> (API-first, then external dynamic crawler if configured, then
+              static/list fallback).
+            </p>
+            <p className="muted">
+              For JS-heavy sites, set <code>CRAWLER_SERVICE_URL</code> to a Playwright/Puppeteer crawler service to
+              collect comments behind scroll, more buttons, and pagination.
+            </p>
 
             <div className="row-2">
               <div className="field">
@@ -295,8 +275,8 @@ export default function HomePage() {
                   value={String(form.collectionMode || "single_page")}
                   onChange={(e) => setForm((s) => ({ ...s, collectionMode: e.target.value }))}
                 >
-                  <option value="single_page">single_page (기본)</option>
-                  <option value="list_to_posts">list_to_posts (목록→게시글→댓글)</option>
+                  <option value="single_page">single_page (湲곕낯)</option>
+                  <option value="list_to_posts">list_to_posts (紐⑸줉?믨쾶?쒓??믩뙎湲)</option>
                 </select>
               </div>
               <div className="field">
@@ -310,7 +290,7 @@ export default function HomePage() {
             </div>
             {String(form.collectionMode || "single_page") === "list_to_posts" ? (
               <p className="muted">
-                목록 페이지에서 게시글 링크를 수집한 뒤, 각 게시글에 들어가 댓글을 모읍니다.
+                紐⑸줉 ?섏씠吏?먯꽌 寃뚯떆湲 留곹겕瑜??섏쭛???? 媛?寃뚯떆湲???ㅼ뼱媛 ?볤???紐⑥쓭?덈떎.
               </p>
             ) : null}
 
@@ -587,8 +567,12 @@ export default function HomePage() {
                     <div className="v">{result.ingestion.pagesScanned}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">Found comments</div>
+                    <div className="k">Found comments (unique)</div>
                     <div className="v">{result.ingestion.commentsFound}</div>
+                  </div>
+                  <div className="metric">
+                    <div className="k">Found rows (raw)</div>
+                    <div className="v">{result.ingestion.commentsFoundRaw ?? result.ingestion.commentsFound}</div>
                   </div>
                   <div className="metric">
                     <div className="k">Unique IDs</div>
@@ -622,7 +606,7 @@ export default function HomePage() {
 
                 {result.crawlPlan && (
                   <div className="plan-box">
-                    <strong>수집조건 해석 결과</strong>
+                    <strong>?섏쭛議곌굔 ?댁꽍 寃곌낵</strong>
                     <div className="muted">
                       start={result.crawlPlan.startDate || "null"} | end={result.crawlPlan.endDate || "null"} |
                       target={result.crawlPlan.targetCommentCount || "null"} | recommended_pages=
@@ -699,3 +683,4 @@ export default function HomePage() {
     </main>
   );
 }
+

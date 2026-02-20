@@ -1,0 +1,15 @@
+{
+  "name": "ai-comment-external-crawler-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "playwright": "^1.51.0"
+  }
+}

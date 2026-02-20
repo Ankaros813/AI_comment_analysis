@@ -68,7 +68,7 @@ function buildConfig(body: AnalyzeRequest): RuntimeConfig {
     crawlTargetInstruction: trimOrDefault(body.crawlTargetInstruction, ""),
     modelName: trimOrDefault(body.modelName, "openai/gpt-4o-mini-2024-07-18"),
     embeddingProvider,
-    crawlMode: body.crawlMode || "static",
+    crawlMode: "auto",
     collectionMode: body.collectionMode === "list_to_posts" ? "list_to_posts" : "single_page",
     crawlScope: (body.crawlScope || "default").trim(),
     sortMode: (body.sortMode || "latest").trim(),
@@ -171,7 +171,7 @@ function buildNoDataMessage(cfg: RuntimeConfig, crawlNotes: string): string {
   lines.push(
     "",
     "## 바로 시도할 해결 방법",
-    "- `Crawl Mode`를 `api_json`으로 바꾸고 실제 댓글 API endpoint/path를 지정",
+    "- `Auto Crawl`은 내부적으로 API 경로를 우선 시도하고, 실패 시 정적 수집으로 폴백합니다.",
     "- 또는 `HTML Selectors`에서 댓글/작성자/시간 selector를 해당 사이트 구조에 맞게 수정",
     "- 테스트 시 `Max Pages`를 1~2로 낮춰 빠르게 검증",
   );
@@ -181,7 +181,7 @@ function buildNoDataMessage(cfg: RuntimeConfig, crawlNotes: string): string {
       "",
       "## 네이버 뉴스 URL 안내",
       "- 네이버 뉴스 댓글은 동적 렌더링 비중이 높아 `static` 모드에서 0건이 나올 수 있습니다.",
-      "- 이 경우 `api_json` 설정 또는 사이트 맞춤 크롤러 구성이 필요합니다.",
+      "- 이 경우 사이트 맞춤 API 설정 또는 외부 동적 크롤러 연동이 필요합니다.",
     );
   }
 
@@ -468,6 +468,7 @@ export async function POST(req: Request) {
         adjustedSinceDt: adjustedSince ? adjustedSince.toISOString() : null,
         pagesScanned: crawl.report.pagesScanned,
         commentsFound: crawl.report.commentsFound,
+        commentsFoundRaw: crawl.report.commentsFoundRaw ?? crawl.report.commentsFound,
         commentsKept: documentRows.length,
         uniqueExternalIds,
         externalIdDedupDropped: dedupDropped,

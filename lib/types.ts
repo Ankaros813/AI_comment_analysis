@@ -1,4 +1,4 @@
-export type CrawlMode = "static" | "dynamic" | "api_json";
+export type CrawlMode = "auto" | "static" | "dynamic" | "api_json";
 export type EmbeddingProvider = "local" | "openrouter";
 export type UserTier = "general" | "pro";
 
@@ -150,6 +150,7 @@ export interface CrawledComment {
 export interface CrawlReport {
   pagesScanned: number;
   commentsFound: number;
+  commentsFoundRaw?: number;
   commentsKept: number;
   modeUsed: string;
   notes: string;

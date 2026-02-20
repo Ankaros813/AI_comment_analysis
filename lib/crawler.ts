@@ -1,4 +1,4 @@
-import * as cheerio from "cheerio";
+﻿import * as cheerio from "cheerio";
 
 import type { CrawledComment, CrawlReport, RuntimeConfig } from "./types";
 import { detectDeleted, normalizeWhitespace, parseDateToIso, stableSha1 } from "./text-ops";
@@ -203,11 +203,11 @@ function extractJsonObjectAfterMarker(text: string, marker: string): string | nu
 
 function normalizeNaverSort(sortMode: string, fallbackSort: string): string {
   const s = (sortMode || "").trim().toLowerCase();
-  if (s.includes("new") || s.includes("latest") || s.includes("최신")) return "NEW";
-  if (s.includes("old") || s.includes("오래") || s.includes("과거")) return "OLD";
-  if (s.includes("reply") || s.includes("답글")) return "REPLY";
-  if (s.includes("relative") || s.includes("관련")) return "RELATIVE";
-  if (s.includes("favorite") || s.includes("popular") || s.includes("공감") || s.includes("인기")) return "FAVORITE";
+  if (s.includes("new") || s.includes("latest")) return "NEW";
+  if (s.includes("old")) return "OLD";
+  if (s.includes("reply")) return "REPLY";
+  if (s.includes("relative")) return "RELATIVE";
+  if (s.includes("favorite") || s.includes("popular")) return "FAVORITE";
   const fb = (fallbackSort || "").trim().toUpperCase();
   return ["FAVORITE", "NEW", "RELATIVE", "REPLY", "OLD"].includes(fb) ? fb : "FAVORITE";
 }
@@ -439,9 +439,10 @@ async function crawlNaverNewsApi(
       report: {
         pagesScanned: 0,
         commentsFound: 0,
+        commentsFoundRaw: 0,
         commentsKept: 0,
         modeUsed: "api_json_naver",
-        notes: "네이버 기사 URL에서 oid/aid를 파싱하지 못했습니다.",
+        notes: "?ㅼ씠踰?湲곗궗 URL?먯꽌 oid/aid瑜??뚯떛?섏? 紐삵뻽?듬땲??",
         lastCursor: null,
       },
     };
@@ -453,7 +454,8 @@ async function crawlNaverNewsApi(
   const notes: string[] = [];
   let expectedTotal = 0;
   let pagesScanned = 0;
-  let commentsFound = 0;
+  let commentsFoundRaw = 0;
+  let commentsFoundUnique = 0;
 
   for (let i = 0; i < cfg.maxPages; i += 1) {
     const pageNum = cfg.pageStart + i;
@@ -466,19 +468,19 @@ async function crawlNaverNewsApi(
     });
     pagesScanned += 1;
     if (!payload) {
-      notes.push(`네이버 본댓글 API 응답 파싱 실패 (page=${pageNum})`);
+      notes.push(`?ㅼ씠踰?蹂몃뙎湲 API ?묐떟 ?뚯떛 ?ㅽ뙣 (page=${pageNum})`);
       break;
     }
 
     const ok = payload.success === true || String(payload.code || "") === "1000";
     if (!ok) {
-      notes.push(`네이버 API 실패 code=${String(payload.code || "")} msg=${String(payload.message || "")}`);
+      notes.push(`?ㅼ씠踰?API ?ㅽ뙣 code=${String(payload.code || "")} msg=${String(payload.message || "")}`);
       break;
     }
 
     const result = getByPath(payload, "result");
     const rowList = Array.isArray(getByPath(result, "commentList")) ? (getByPath(result, "commentList") as unknown[]) : [];
-    commentsFound += rowList.length;
+    commentsFoundRaw += rowList.length;
     if (!expectedTotal) {
       expectedTotal = Math.max(0, toFiniteInt(getByPath(result, "count.comment"), 0));
     }
@@ -495,7 +497,10 @@ async function crawlNaverNewsApi(
         sinceDate,
         seenExternalIds,
       });
-      if (mapped) comments.push(mapped);
+      if (mapped) {
+        comments.push(mapped);
+        commentsFoundUnique += 1;
+      }
     }
 
     const parentCandidates = rowList.filter(
@@ -522,14 +527,14 @@ async function crawlNaverNewsApi(
         });
         pagesScanned += 1;
         if (!replyPayload) {
-          notes.push(`대댓글 API 응답 파싱 실패 (parent=${parentCommentNo}, page=${rp})`);
+          notes.push(`??볤? API ?묐떟 ?뚯떛 ?ㅽ뙣 (parent=${parentCommentNo}, page=${rp})`);
           break;
         }
 
         const replyOk = replyPayload.success === true || String(replyPayload.code || "") === "1000";
         if (!replyOk) {
           notes.push(
-            `대댓글 API 실패 parent=${parentCommentNo} code=${String(replyPayload.code || "")} msg=${String(replyPayload.message || "")}`,
+            `??볤? API ?ㅽ뙣 parent=${parentCommentNo} code=${String(replyPayload.code || "")} msg=${String(replyPayload.message || "")}`,
           );
           break;
         }
@@ -538,7 +543,7 @@ async function crawlNaverNewsApi(
         const replyRows = Array.isArray(getByPath(replyResult, "commentList"))
           ? (getByPath(replyResult, "commentList") as unknown[])
           : [];
-        commentsFound += replyRows.length;
+        commentsFoundRaw += replyRows.length;
         let addedThisReplyPage = 0;
 
         for (const rr of replyRows) {
@@ -558,6 +563,7 @@ async function crawlNaverNewsApi(
           if (mapped) {
             comments.push(mapped);
             addedThisReplyPage += 1;
+            commentsFoundUnique += 1;
           }
         }
 
@@ -582,18 +588,19 @@ async function crawlNaverNewsApi(
   }
 
   if (!comments.length) {
-    notes.push("네이버 댓글 수집 결과가 0건입니다. 페이지 접근 권한/정책 또는 파라미터를 확인하세요.");
+    notes.push("?ㅼ씠踰??볤? ?섏쭛 寃곌낵媛 0嫄댁엯?덈떎. ?섏씠吏 ?묎렐 沅뚰븳/?뺤콉 ?먮뒗 ?뚮씪誘명꽣瑜??뺤씤?섏꽭??");
   } else if (expectedTotal > 0 && comments.length < expectedTotal) {
-    notes.push(`예상 댓글수(${expectedTotal}) 대비 수집수(${comments.length})가 적습니다. Max Pages/정렬/접근정책을 확인하세요.`);
+    notes.push(`?덉긽 ?볤???${expectedTotal}) ?鍮??섏쭛??${comments.length})媛 ?곸뒿?덈떎. Max Pages/?뺣젹/?묎렐?뺤콉???뺤씤?섏꽭??`);
   } else if (expectedTotal > 0) {
-    notes.push(`예상 댓글수(${expectedTotal}) 기준으로 ${comments.length}건 수집했습니다.`);
+    notes.push(`?덉긽 ?볤???${expectedTotal}) 湲곗??쇰줈 ${comments.length}嫄??섏쭛?덉뒿?덈떎.`);
   }
 
   return {
     comments,
     report: {
       pagesScanned,
-      commentsFound,
+      commentsFound: commentsFoundUnique,
+      commentsFoundRaw,
       commentsKept: comments.length,
       modeUsed: "api_json_naver",
       notes: notes.join(" ").slice(0, 500),
@@ -814,13 +821,14 @@ async function crawlStatic(
     comments,
     report: {
       pagesScanned: visited.size,
-      commentsFound,
+      commentsFound: comments.length,
+      commentsFoundRaw: commentsFound,
       commentsKept: comments.length,
       modeUsed: "static",
       notes:
         commentsFound > 0
           ? ""
-          : `댓글 노드를 찾지 못했습니다. commentSelector="${cfg.commentSelector}"`,
+          : `?볤? ?몃뱶瑜?李얠? 紐삵뻽?듬땲?? commentSelector="${cfg.commentSelector}"`,
       lastCursor: null,
     },
   };
@@ -859,7 +867,7 @@ async function crawlStaticListToPosts(
       cfg.retryBackoffSec,
     );
     if (!res || res.status >= 400) {
-      notes.push(`목록 페이지 요청 실패: ${listPageUrl}`);
+      notes.push(`紐⑸줉 ?섏씠吏 ?붿껌 ?ㅽ뙣: ${listPageUrl}`);
       continue;
     }
     const html = await res.text();
@@ -921,16 +929,17 @@ async function crawlStaticListToPosts(
   }
 
   if (!selectedPostUrls.length) {
-    notes.push(`게시글 링크를 찾지 못했습니다. postLinkSelector="${cfg.postLinkSelector}"`);
+    notes.push(`寃뚯떆湲 留곹겕瑜?李얠? 紐삵뻽?듬땲?? postLinkSelector="${cfg.postLinkSelector}"`);
   } else {
-    notes.push(`목록에서 게시글 ${selectedPostUrls.length}개를 수집해 댓글 페이지를 순회했습니다.`);
+    notes.push(`紐⑸줉?먯꽌 寃뚯떆湲 ${selectedPostUrls.length}媛쒕? ?섏쭛???볤? ?섏씠吏瑜??쒗쉶?덉뒿?덈떎.`);
   }
 
   return {
     comments,
     report: {
       pagesScanned,
-      commentsFound,
+      commentsFound: comments.length,
+      commentsFoundRaw: commentsFound,
       commentsKept: comments.length,
       modeUsed: "static_list_posts",
       notes: notes.join(" ").slice(0, 500),
@@ -1065,16 +1074,397 @@ async function crawlApiJson(
     comments,
     report: {
       pagesScanned,
-      commentsFound,
+      commentsFound: comments.length,
+      commentsFoundRaw: commentsFound,
       commentsKept: comments.length,
       modeUsed: "api_json",
       notes:
         commentsFound > 0
           ? ""
-          : `API 응답에서 댓글 배열을 찾지 못했습니다. apiCommentsPath="${cfg.apiCommentsPath}"`,
+          : `API ?묐떟?먯꽌 ?볤? 諛곗뿴??李얠? 紐삵뻽?듬땲?? apiCommentsPath="${cfg.apiCommentsPath}"`,
       lastCursor: cursor,
     },
   };
+}
+
+function commentCandidateKeys(): string[] {
+  return [
+    "content",
+    "contents",
+    "text",
+    "body",
+    "message",
+    "comment",
+    "commenttext",
+    "comment_text",
+  ];
+}
+
+function authorCandidateKeys(): string[] {
+  return ["author", "writer", "user", "username", "nick", "nickname", "name"];
+}
+
+function dateCandidateKeys(): string[] {
+  return ["created_at", "createdat", "date", "datetime", "time", "published_at", "regtime", "modtime"];
+}
+
+function idCandidateKeys(): string[] {
+  return ["id", "comment_id", "commentid", "comment_no", "commentno", "replyno"];
+}
+
+function parentIdCandidateKeys(): string[] {
+  return ["parent_id", "parentid", "parent_comment_id", "parentcommentno", "parentcomment_id"];
+}
+
+function pickKeyByCandidates(obj: Record<string, unknown>, candidates: string[]): string | null {
+  const keys = Object.keys(obj);
+  const norm = new Map<string, string>();
+  for (const k of keys) {
+    norm.set(k.toLowerCase().replace(/[^a-z0-9]/g, ""), k);
+  }
+  for (const c of candidates) {
+    const found = norm.get(c.toLowerCase().replace(/[^a-z0-9]/g, ""));
+    if (found) return found;
+  }
+  return null;
+}
+
+function looksLikeCommentRecord(v: unknown): boolean {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+  const row = v as Record<string, unknown>;
+  const textKey = pickKeyByCandidates(row, commentCandidateKeys());
+  if (!textKey) return false;
+  const text = normalizeWhitespace(String(row[textKey] || ""));
+  return text.length >= 2;
+}
+
+function findCommentArrayPath(value: unknown, path = "", depth = 0): string | null {
+  if (depth > 7) return null;
+  if (Array.isArray(value)) {
+    const sample = value.find((v) => v && typeof v === "object");
+    if (sample && looksLikeCommentRecord(sample)) {
+      return path;
+    }
+    for (let i = 0; i < Math.min(value.length, 5); i += 1) {
+      const p = findCommentArrayPath(value[i], path, depth + 1);
+      if (p !== null) return p;
+    }
+    return null;
+  }
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
+  for (const [k, v] of Object.entries(obj)) {
+    const nextPath = path ? `${path}.${k}` : k;
+    const found = findCommentArrayPath(v, nextPath, depth + 1);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+function extractApiCandidatesFromHtml(sourceUrl: string, html: string): string[] {
+  const out = new Set<string>();
+  let base: URL;
+  try {
+    base = new URL(sourceUrl);
+  } catch {
+    return [];
+  }
+
+  const addCandidate = (raw: string) => {
+    const token = (raw || "").trim();
+    if (!token) return;
+    if (!/(comment|reply|cbox|discuss|talkback|repl|cmnt)/i.test(token)) return;
+    try {
+      const abs = new URL(token, base).toString();
+      const u = new URL(abs);
+      if (u.host !== base.host) return;
+      if (/\.(js|css|png|jpg|jpeg|gif|svg|woff2?|ttf)(\?|$)/i.test(u.pathname)) return;
+      out.add(abs);
+    } catch {}
+  };
+
+  const $ = cheerio.load(html);
+  $("script[src],a[href],link[href]").each((_, el) => {
+    const src = ($(el).attr("src") || $(el).attr("href") || "").trim();
+    if (src) addCandidate(src);
+  });
+
+  const absoluteMatches = html.match(/https?:\/\/[^\s"'<>\\]+/g) || [];
+  for (const m of absoluteMatches) addCandidate(m);
+
+  const relativeMatches =
+    html.match(/["'](\/[^"']*(comment|reply|cbox|discuss|talkback|repl|cmnt)[^"']*)["']/gi) || [];
+  for (const m of relativeMatches) {
+    const cleaned = m.slice(1, -1);
+    addCandidate(cleaned);
+  }
+
+  return [...out].slice(0, 24);
+}
+
+async function crawlByDiscoveredApi(
+  cfg: RuntimeConfig,
+  sinceDate: Date | null,
+): Promise<{ comments: CrawledComment[]; report: CrawlReport } | null> {
+  const headers = headersFromConfig(cfg);
+  if (!headers.referer) headers.referer = cfg.sourceUrl;
+  const res = await fetchWithRetry(
+    cfg.sourceUrl,
+    { method: "GET", headers },
+    cfg.maxRetries,
+    cfg.retryBackoffSec,
+  );
+  if (!res || res.status >= 400) return null;
+  const html = await res.text();
+  const candidates = extractApiCandidatesFromHtml(cfg.sourceUrl, html);
+  if (!candidates.length) return null;
+
+  for (const endpoint of candidates) {
+    const probe = await fetchWithRetry(
+      endpoint,
+      { method: "GET", headers },
+      cfg.maxRetries,
+      cfg.retryBackoffSec,
+    );
+    if (!probe || probe.status >= 400) continue;
+    const payload = await readJsonOrJsonp(probe);
+    if (!payload) continue;
+    const commentsPath = findCommentArrayPath(payload);
+    if (commentsPath === null) continue;
+
+    const probeRows = getByPath(payload, commentsPath);
+    const rowList = Array.isArray(probeRows) ? probeRows : [];
+    const sample = rowList.find((v) => v && typeof v === "object") as Record<string, unknown> | undefined;
+    const idField = sample ? pickKeyByCandidates(sample, idCandidateKeys()) || cfg.apiIdField : cfg.apiIdField;
+    const contentField = sample
+      ? pickKeyByCandidates(sample, commentCandidateKeys()) || cfg.apiContentField
+      : cfg.apiContentField;
+    const authorField = sample
+      ? pickKeyByCandidates(sample, authorCandidateKeys()) || cfg.apiAuthorField
+      : cfg.apiAuthorField;
+    const datetimeField = sample
+      ? pickKeyByCandidates(sample, dateCandidateKeys()) || cfg.apiDatetimeField
+      : cfg.apiDatetimeField;
+    const parentIdField = sample
+      ? pickKeyByCandidates(sample, parentIdCandidateKeys()) || cfg.apiParentIdField
+      : cfg.apiParentIdField;
+
+    const apiCfg: RuntimeConfig = {
+      ...cfg,
+      apiEndpoint: endpoint,
+      apiMethod: "GET",
+      apiCommentsPath: commentsPath,
+      apiHasMorePath: "",
+      apiNextCursorPath: "",
+      apiPageParam: "page",
+      apiCursorParam: "",
+      apiIdField: idField,
+      apiContentField: contentField,
+      apiAuthorField: authorField,
+      apiDatetimeField: datetimeField,
+      apiParentIdField: parentIdField,
+    };
+
+    const out = await crawlApiJson(apiCfg, sinceDate);
+    if (out.comments.length > 0) {
+      out.report.modeUsed = "auto_api_discovered";
+      out.report.notes = `auto discovered endpoint=${endpoint}, path=${commentsPath}`.slice(0, 500);
+      return out;
+    }
+  }
+  return null;
+}
+
+function coerceExternalComments(
+  cfg: RuntimeConfig,
+  sinceDate: Date | null,
+  rows: unknown[],
+): { comments: CrawledComment[]; rawCount: number } {
+  const comments: CrawledComment[] = [];
+  const seen = new Set<string>();
+  const rawCount = rows.length;
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i];
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const rec = row as Record<string, unknown>;
+    const textRaw =
+      String(
+        rec.content ??
+          rec.contents ??
+          rec.text ??
+          rec.body ??
+          rec.message ??
+          rec.comment ??
+          rec.comment_text ??
+          "",
+      ) || "";
+    const content = normalizeWhitespace(textRaw);
+    if (content.length < cfg.minCommentLength) continue;
+
+    const author = normalizeWhitespace(
+      String(rec.author ?? rec.writer ?? rec.user ?? rec.username ?? rec.nickname ?? rec.name ?? ""),
+    );
+    const dtRaw = String(rec.published_at ?? rec.created_at ?? rec.datetime ?? rec.date ?? rec.time ?? "");
+    const publishedIso = dtRaw ? parseDateToIso(dtRaw, cfg.defaultTimezoneOffsetHours) : null;
+    if (sinceDate && publishedIso) {
+      const d = new Date(publishedIso);
+      if (!Number.isNaN(d.getTime()) && d <= sinceDate) continue;
+    }
+
+    let externalId = normalizeWhitespace(String(rec.external_id ?? rec.id ?? rec.comment_id ?? rec.commentNo ?? ""));
+    if (!externalId) {
+      externalId = stableSha1(`${cfg.sourceUrl}|${i}|${author}|${publishedIso || ""}|${content}`);
+    }
+    if (seen.has(externalId)) continue;
+    seen.add(externalId);
+
+    const parentId = normalizeWhitespace(
+      String(rec.parent_external_id ?? rec.parent_id ?? rec.parentCommentNo ?? rec.parentCommentId ?? ""),
+    );
+    const statusRaw = normalizeWhitespace(String(rec.status ?? ""));
+    const isDeleted = statusRaw === "deleted" || detectDeleted(content, cfg.deletedMarkersCsv);
+    const commentUrl = normalizeWhitespace(String(rec.comment_url ?? rec.commentUrl ?? cfg.sourceUrl)) || cfg.sourceUrl;
+    const contentHash = stableSha1(`${cfg.sourceUrl}|${externalId}|${author}|${publishedIso || ""}|${content}`);
+
+    comments.push({
+      source_url: cfg.sourceUrl,
+      external_id: externalId,
+      parent_external_id: parentId || null,
+      content,
+      pii_masked_content: "",
+      author: author || null,
+      comment_url: commentUrl,
+      published_at: publishedIso,
+      status: isDeleted ? "deleted" : "active",
+      is_spam: false,
+      source_type: "external_dynamic",
+      metadata: {
+        collected_at: new Date().toISOString(),
+        external_service: true,
+      },
+      content_hash: contentHash,
+    });
+  }
+  return { comments, rawCount };
+}
+
+async function crawlWithExternalService(
+  cfg: RuntimeConfig,
+  sinceDate: Date | null,
+): Promise<{ comments: CrawledComment[]; report: CrawlReport } | null> {
+  const serviceUrl = (process.env.CRAWLER_SERVICE_URL || "").trim();
+  if (!serviceUrl) return null;
+  const serviceToken = (process.env.CRAWLER_SERVICE_TOKEN || "").trim();
+
+  const payload = {
+    sourceUrl: cfg.sourceUrl,
+    since: sinceDate ? sinceDate.toISOString() : null,
+    maxPages: cfg.maxPages,
+    maxPosts: cfg.maxPosts,
+    maxCommentPagesPerPost: cfg.maxCommentPagesPerPost,
+    collectionMode: cfg.collectionMode,
+    selectors: {
+      comment: cfg.commentSelector,
+      author: cfg.authorSelector,
+      datetime: cfg.datetimeSelector,
+      next: cfg.nextPageSelector,
+      postLink: cfg.postLinkSelector,
+      listNext: cfg.listNextPageSelector,
+      commentNext: cfg.commentNextPageSelector,
+    },
+  };
+
+  const res = await fetchWithRetry(
+    serviceUrl,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(serviceToken ? { "x-crawler-token": serviceToken } : {}),
+      },
+      body: JSON.stringify(payload),
+    },
+    cfg.maxRetries,
+    cfg.retryBackoffSec,
+  );
+  if (!res || res.status >= 400) return null;
+
+  const json = (await res.json()) as Record<string, unknown>;
+  const rows =
+    (Array.isArray(json.comments) && json.comments) ||
+    (json.data && typeof json.data === "object" && Array.isArray((json.data as Record<string, unknown>).comments)
+      ? ((json.data as Record<string, unknown>).comments as unknown[])
+      : null);
+  if (!rows) return null;
+
+  const mapped = coerceExternalComments(cfg, sinceDate, rows);
+  return {
+    comments: mapped.comments,
+    report: {
+      pagesScanned: Math.max(1, Number(json.pagesScanned || 1)),
+      commentsFound: mapped.comments.length,
+      commentsFoundRaw: mapped.rawCount,
+      commentsKept: mapped.comments.length,
+      modeUsed: "external_dynamic",
+      notes: normalizeWhitespace(String(json.notes || "auto external crawler used")).slice(0, 500),
+      lastCursor: null,
+    },
+  };
+}
+
+async function crawlAuto(
+  cfg: RuntimeConfig,
+  sinceDate: Date | null,
+): Promise<{ comments: CrawledComment[]; report: CrawlReport }> {
+  const notes: string[] = [];
+
+  if (cfg.apiEndpoint.trim()) {
+    const out = await crawlApiJson(cfg, sinceDate);
+    if (out.comments.length > 0) {
+      out.report.modeUsed = "auto_api_json";
+      out.report.notes = `auto used provided apiEndpoint. ${out.report.notes}`.slice(0, 500);
+      return out;
+    }
+    notes.push("apiEndpoint returned 0");
+  }
+
+  const discovered = await crawlByDiscoveredApi(cfg, sinceDate);
+  if (discovered && discovered.comments.length > 0) {
+    if (notes.length) discovered.report.notes = `${notes.join(" | ")} | ${discovered.report.notes}`.slice(0, 500);
+    return discovered;
+  }
+  if (!discovered) notes.push("api discovery not matched");
+  else notes.push("api discovery matched but returned 0");
+
+  const external = await crawlWithExternalService(cfg, sinceDate);
+  if (external && external.comments.length > 0) {
+    if (notes.length) external.report.notes = `${notes.join(" | ")} | ${external.report.notes}`.slice(0, 500);
+    return external;
+  }
+  if (!external) notes.push("external crawler unavailable");
+  else notes.push("external crawler returned 0");
+
+  if (cfg.collectionMode === "list_to_posts") {
+    const out = await crawlStaticListToPosts(cfg, sinceDate);
+    out.report.modeUsed = "auto_static_list_posts";
+    out.report.notes = `${notes.join(" | ")}${out.report.notes ? ` | ${out.report.notes}` : ""}`.slice(0, 500);
+    return out;
+  }
+
+  const single = await crawlStatic(cfg, sinceDate);
+  if (single.comments.length > 0) {
+    single.report.modeUsed = "auto_static";
+    single.report.notes = `${notes.join(" | ")}${single.report.notes ? ` | ${single.report.notes}` : ""}`.slice(0, 500);
+    return single;
+  }
+
+  const listFallback = await crawlStaticListToPosts(cfg, sinceDate);
+  listFallback.report.modeUsed = "auto_static_list_posts";
+  listFallback.report.notes = `${notes.join(" | ")}${listFallback.report.notes ? ` | ${listFallback.report.notes}` : ""}`.slice(
+    0,
+    500,
+  );
+  return listFallback;
 }
 
 export async function crawlComments(
@@ -1086,7 +1476,7 @@ export async function crawlComments(
     try {
       return await crawlNaverNewsApi(cfg, sinceDate);
     } catch (err) {
-      naverError = `네이버 전용 수집 실패: ${err instanceof Error ? err.message : "unknown"}`;
+      naverError = `naver crawl failed: ${err instanceof Error ? err.message : "unknown"}`;
     }
   }
 
@@ -1095,23 +1485,28 @@ export async function crawlComments(
     if (naverError) out.report.notes = `${naverError} | ${out.report.notes}`.slice(0, 500);
     return out;
   }
-  if (cfg.collectionMode === "list_to_posts") {
-    const out = await crawlStaticListToPosts(cfg, sinceDate);
-    if (cfg.crawlMode === "dynamic") {
-      out.report.notes = `dynamic mode is not supported on Vercel serverless. Fell back to static list mode. ${out.report.notes}`.slice(
-        0,
-        500,
-      );
+  if (cfg.crawlMode === "dynamic") {
+    const external = await crawlWithExternalService(cfg, sinceDate);
+    if (external) {
+      if (naverError) external.report.notes = `${naverError} | ${external.report.notes}`.slice(0, 500);
+      return external;
     }
+    const fallback = await crawlStatic(cfg, sinceDate);
+    fallback.report.modeUsed = "static";
+    fallback.report.notes = "dynamic is unsupported on Vercel; fell back to static.";
+    if (naverError) fallback.report.notes = `${naverError} | ${fallback.report.notes}`.slice(0, 500);
+    return fallback;
+  }
+  if (cfg.crawlMode === "auto") {
+    const out = await crawlAuto(cfg, sinceDate);
     if (naverError) out.report.notes = `${naverError} | ${out.report.notes}`.slice(0, 500);
     return out;
   }
-  if (cfg.crawlMode === "dynamic") {
-    const fallback = await crawlStatic(cfg, sinceDate);
-    fallback.report.modeUsed = "static";
-    fallback.report.notes = "dynamic mode is not supported on Vercel serverless. Fell back to static mode.";
-    if (naverError) fallback.report.notes = `${naverError} | ${fallback.report.notes}`.slice(0, 500);
-    return fallback;
+
+  if (cfg.collectionMode === "list_to_posts") {
+    const out = await crawlStaticListToPosts(cfg, sinceDate);
+    if (naverError) out.report.notes = `${naverError} | ${out.report.notes}`.slice(0, 500);
+    return out;
   }
   const out = await crawlStatic(cfg, sinceDate);
   if (naverError) out.report.notes = `${naverError} | ${out.report.notes}`.slice(0, 500);

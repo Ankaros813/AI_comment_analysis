@@ -103,3 +103,13 @@ npm run dev
   - `COMMENT_USE_PAID_EMBEDDING=1` (forces paid embedding)
   - `COMMENT_EMBEDDING_MODEL=openai/text-embedding-3-small`
   - `COMMENT_EMBEDDING_DIM=1536`
+
+## External Dynamic Crawler
+- UI crawl mode is fixed to `auto`.
+- For dynamic pages (JS render, infinite scroll, more buttons), run an external Playwright crawler service.
+- Set Vercel env:
+  - `CRAWLER_SERVICE_URL=https://<your-service>/crawl`
+  - `CRAWLER_SERVICE_TOKEN=<token>` (optional)
+- See:
+  - `external_crawler_service/README.md`
+  - `EXTERNAL_CRAWLER_SETUP.md`
