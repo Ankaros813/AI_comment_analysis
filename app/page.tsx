@@ -686,7 +686,7 @@ export default function HomePage() {
                     <div className="v">{result.ingestion.embeddingSkippedUnchanged}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">RAG 문서 수</div>
+                    <div className="k">미리보기 문서 수</div>
                     <div className="v">{result.documents.length}</div>
                   </div>
                 </div>
@@ -704,7 +704,6 @@ export default function HomePage() {
 
                 <p className="muted">
                   모드={result.ingestion.crawlMode}
-                  {result.ingestion.crawlNotes ? ` | 메모=${result.ingestion.crawlNotes}` : ""}
                   {typeof result.ingestion.externalIdDedupDropped === "number"
                     ? ` | 중복제거=${result.ingestion.externalIdDedupDropped}`
                     : ""}

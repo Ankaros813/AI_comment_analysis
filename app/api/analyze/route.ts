@@ -275,7 +275,8 @@ export async function POST(req: Request) {
       cfg.embeddingProvider === "openrouter" ? 1536 : envEmbeddingDim ?? providerDefaultDim;
     const embeddingModelLabel =
       cfg.embeddingProvider === "openrouter" ? embeddingModelName : `local-hash-${embeddingDim}`;
-    const topK = toInt(process.env.COMMENT_TOP_K, 24);
+    const topK = Math.max(5, toInt(process.env.COMMENT_TOP_K, 24));
+    const minPreviewDocs = Math.max(5, Math.min(40, toInt(process.env.COMMENT_PREVIEW_MIN, 5)));
     const maxContextChars = toInt(process.env.COMMENT_MAX_CONTEXT_CHARS, 14000);
     const timeoutSec = toInt(process.env.COMMENT_REQUEST_TIMEOUT_SEC, 45);
 
@@ -484,6 +485,39 @@ export async function POST(req: Request) {
       })) as Record<string, unknown>[];
     }
 
+    let previewDocs = [...ragDocs];
+    if (previewDocs.length < minPreviewDocs) {
+      const recentDocs = (await fetchRecentDocuments({
+        sourceUrl: cfg.sourceUrl,
+        crawlScope: cfg.crawlScope,
+        sortMode: cfg.sortMode,
+        topK: Math.max(topK, minPreviewDocs),
+        excludeDeleted: cfg.excludeDeletedFromModel,
+        excludeSpam: cfg.excludeSpamFromModel,
+      })) as Record<string, unknown>[];
+
+      const seen = new Set(
+        previewDocs.map((d) =>
+          String(
+            d.id ||
+              d.external_id ||
+              `${String(d.comment_url || "")}|${String(d.published_at || "")}|${String(d.content_hash || "")}`,
+          ),
+        ),
+      );
+      for (const row of recentDocs) {
+        const key = String(
+          row.id ||
+            row.external_id ||
+            `${String(row.comment_url || "")}|${String(row.published_at || "")}|${String(row.content_hash || "")}`,
+        );
+        if (seen.has(key)) continue;
+        seen.add(key);
+        previewDocs.push(row);
+        if (previewDocs.length >= minPreviewDocs) break;
+      }
+    }
+
     const analysisMarkdown =
       ragDocs.length || documentRows.length
         ? await callOpenRouter({
@@ -536,7 +570,7 @@ export async function POST(req: Request) {
       keywords,
       analysisMarkdown,
       crawlPlan,
-      documents: ragDocs.slice(0, 40),
+      documents: previewDocs.slice(0, 40),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
