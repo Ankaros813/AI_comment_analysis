@@ -27,7 +27,17 @@ create table if not exists public.documents (
     constraint documents_status_check check (status in ('active', 'deleted'))
 );
 
-create table if not exists public.comment_embeddings (
+-- Local/free embedding table
+create table if not exists public.comment_embeddings_384 (
+    document_id uuid primary key references public.documents(id) on delete cascade,
+    embedding vector(384) not null,
+    content_hash text not null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+-- Paid embedding table
+create table if not exists public.comment_embeddings_1536 (
     document_id uuid primary key references public.documents(id) on delete cascade,
     embedding vector(1536) not null,
     content_hash text not null,
@@ -55,8 +65,13 @@ create index if not exists idx_documents_status_spam
 create index if not exists idx_documents_content_hash
     on public.documents (content_hash);
 
-create index if not exists idx_embeddings_ivfflat
-    on public.comment_embeddings
+create index if not exists idx_embeddings_384_ivfflat
+    on public.comment_embeddings_384
+    using ivfflat (embedding vector_cosine_ops)
+    with (lists = 100);
+
+create index if not exists idx_embeddings_1536_ivfflat
+    on public.comment_embeddings_1536
     using ivfflat (embedding vector_cosine_ops)
     with (lists = 100);
 
@@ -75,9 +90,14 @@ create trigger trg_documents_updated_at
 before update on public.documents
 for each row execute procedure public.set_updated_at();
 
-drop trigger if exists trg_embeddings_updated_at on public.comment_embeddings;
-create trigger trg_embeddings_updated_at
-before update on public.comment_embeddings
+drop trigger if exists trg_embeddings_384_updated_at on public.comment_embeddings_384;
+create trigger trg_embeddings_384_updated_at
+before update on public.comment_embeddings_384
+for each row execute procedure public.set_updated_at();
+
+drop trigger if exists trg_embeddings_1536_updated_at on public.comment_embeddings_1536;
+create trigger trg_embeddings_1536_updated_at
+before update on public.comment_embeddings_1536
 for each row execute procedure public.set_updated_at();
 
 drop trigger if exists trg_crawl_state_updated_at on public.crawl_state;
@@ -85,7 +105,54 @@ create trigger trg_crawl_state_updated_at
 before update on public.crawl_state
 for each row execute procedure public.set_updated_at();
 
-create or replace function public.match_comment_embeddings(
+create or replace function public.match_comment_embeddings_384(
+    query_embedding vector(384),
+    match_source_url text,
+    match_crawl_scope text default null,
+    match_sort_mode text default null,
+    match_count int default 20,
+    filter_exclude_deleted boolean default true,
+    filter_exclude_spam boolean default true
+)
+returns table (
+    document_id uuid,
+    content text,
+    pii_masked_content text,
+    author text,
+    comment_url text,
+    published_at timestamptz,
+    status text,
+    is_spam boolean,
+    metadata jsonb,
+    similarity float
+)
+language sql
+stable
+as $$
+    select
+        d.id as document_id,
+        d.content,
+        d.pii_masked_content,
+        d.author,
+        d.comment_url,
+        d.published_at,
+        d.status,
+        d.is_spam,
+        d.metadata,
+        1 - (e.embedding <=> query_embedding) as similarity
+    from public.comment_embeddings_384 e
+    join public.documents d
+      on d.id = e.document_id
+    where d.source_url = match_source_url
+      and (match_crawl_scope is null or d.crawl_scope = match_crawl_scope)
+      and (match_sort_mode is null or d.sort_mode = match_sort_mode)
+      and (not filter_exclude_deleted or d.status = 'active')
+      and (not filter_exclude_spam or d.is_spam = false)
+    order by e.embedding <=> query_embedding
+    limit greatest(match_count, 1);
+$$;
+
+create or replace function public.match_comment_embeddings_1536(
     query_embedding vector(1536),
     match_source_url text,
     match_crawl_scope text default null,
@@ -120,7 +187,7 @@ as $$
         d.is_spam,
         d.metadata,
         1 - (e.embedding <=> query_embedding) as similarity
-    from public.comment_embeddings e
+    from public.comment_embeddings_1536 e
     join public.documents d
       on d.id = e.document_id
     where d.source_url = match_source_url
@@ -130,4 +197,40 @@ as $$
       and (not filter_exclude_spam or d.is_spam = false)
     order by e.embedding <=> query_embedding
     limit greatest(match_count, 1);
+$$;
+
+-- Backward compatibility alias (1536 path)
+create or replace function public.match_comment_embeddings(
+    query_embedding vector(1536),
+    match_source_url text,
+    match_crawl_scope text default null,
+    match_sort_mode text default null,
+    match_count int default 20,
+    filter_exclude_deleted boolean default true,
+    filter_exclude_spam boolean default true
+)
+returns table (
+    document_id uuid,
+    content text,
+    pii_masked_content text,
+    author text,
+    comment_url text,
+    published_at timestamptz,
+    status text,
+    is_spam boolean,
+    metadata jsonb,
+    similarity float
+)
+language sql
+stable
+as $$
+    select * from public.match_comment_embeddings_1536(
+      query_embedding,
+      match_source_url,
+      match_crawl_scope,
+      match_sort_mode,
+      match_count,
+      filter_exclude_deleted,
+      filter_exclude_spam
+    );
 $$;

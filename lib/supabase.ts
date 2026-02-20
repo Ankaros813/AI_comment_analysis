@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
+type EmbeddingDim = 384 | 1536;
+
 function requiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -14,6 +16,18 @@ export function getSupabaseClient() {
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+function normalizeEmbeddingDim(dim: number): EmbeddingDim {
+  return Number(dim) === 384 ? 384 : 1536;
+}
+
+function embeddingTableName(dim: number): "comment_embeddings_384" | "comment_embeddings_1536" {
+  return normalizeEmbeddingDim(dim) === 384 ? "comment_embeddings_384" : "comment_embeddings_1536";
+}
+
+function embeddingRpcName(dim: number): "match_comment_embeddings_384" | "match_comment_embeddings_1536" {
+  return normalizeEmbeddingDim(dim) === 384 ? "match_comment_embeddings_384" : "match_comment_embeddings_1536";
 }
 
 export async function getCrawlState(input: {
@@ -91,15 +105,16 @@ export async function fetchDocumentsByExternalIds(sourceUrl: string, externalIds
   return collected;
 }
 
-export async function fetchEmbeddingHashMap(documentIds: string[]) {
+export async function fetchEmbeddingHashMap(documentIds: string[], embeddingDim: number) {
   if (!documentIds.length) return new Map<string, string>();
   const supabase = getSupabaseClient();
+  const table = embeddingTableName(embeddingDim);
   const hashMap = new Map<string, string>();
   const chunkSize = 200;
   for (let i = 0; i < documentIds.length; i += chunkSize) {
     const chunk = documentIds.slice(i, i + chunkSize);
     const { data, error } = await supabase
-      .from("comment_embeddings")
+      .from(table)
       .select("document_id,content_hash")
       .in("document_id", chunk);
     if (error) throw error;
@@ -110,14 +125,15 @@ export async function fetchEmbeddingHashMap(documentIds: string[]) {
   return hashMap;
 }
 
-export async function upsertEmbeddings(rows: Record<string, unknown>[]) {
+export async function upsertEmbeddings(rows: Record<string, unknown>[], embeddingDim: number) {
   if (!rows.length) return;
   const supabase = getSupabaseClient();
+  const table = embeddingTableName(embeddingDim);
   // Vector payloads are large; batch writes to avoid PostgREST payload/time limits.
   const chunkSize = 24;
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
-    const { error } = await supabase.from("comment_embeddings").upsert(chunk, {
+    const { error } = await supabase.from(table).upsert(chunk, {
       onConflict: "document_id",
     });
     if (error) {
@@ -134,13 +150,15 @@ export async function searchSimilarDocuments(input: {
   sourceUrl: string;
   crawlScope: string;
   sortMode: string;
+  embeddingDim: number;
   queryEmbeddingLiteral: string;
   topK: number;
   excludeDeleted: boolean;
   excludeSpam: boolean;
 }) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.rpc("match_comment_embeddings", {
+  const rpcName = embeddingRpcName(input.embeddingDim);
+  const { data, error } = await supabase.rpc(rpcName, {
     query_embedding: input.queryEmbeddingLiteral,
     match_source_url: input.sourceUrl,
     match_crawl_scope: input.crawlScope,

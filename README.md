@@ -5,7 +5,7 @@
 ## 핵심 구성
 - Frontend/App: Next.js (`app/page.tsx`)
 - Backend API: Next.js Route Handler (`app/api/analyze/route.ts`)
-- DB: Supabase (`documents`, `comment_embeddings`, `crawl_state`)
+- DB: Supabase (`documents`, `comment_embeddings_384`, `comment_embeddings_1536`, `crawl_state`)
 - LLM: OpenRouter (`openai/gpt-4o-mini-2024-07-18` 기본)
 - 비용 최적화:
   - 임베딩은 로컬 해시(무료)
@@ -98,11 +98,14 @@ npm run dev
 - Default: `local` (free hash embedding, no embedding API billing)
 - Paid option: `openrouter` with `openai/text-embedding-3-small`
 - UI toggle: `Use paid embeddings`
+- Embedding storage:
+  - local -> `comment_embeddings_384`
+  - openrouter -> `comment_embeddings_1536`
 - Optional env:
   - `COMMENT_EMBEDDING_PROVIDER=local|openrouter`
   - `COMMENT_USE_PAID_EMBEDDING=1` (forces paid embedding)
   - `COMMENT_EMBEDDING_MODEL=openai/text-embedding-3-small`
-  - `COMMENT_EMBEDDING_DIM=1536`
+  - `COMMENT_EMBEDDING_DIM=384|1536` (local only; openrouter path is fixed to 1536)
 
 ## External Dynamic Crawler
 - UI crawl mode is fixed to `auto`.

@@ -267,8 +267,12 @@ export async function POST(req: Request) {
     const openrouterKey = requiredEnv("OPENROUTER_HACKERTHON_API_KEY");
     const embeddingModelName = (process.env.COMMENT_EMBEDDING_MODEL || "openai/text-embedding-3-small").trim();
     const providerDefaultDim = cfg.embeddingProvider === "openrouter" ? 1536 : 384;
-    const envEmbeddingDim = toOptionalInt(process.env.COMMENT_EMBEDDING_DIM);
-    const embeddingDim = Math.max(1, Math.min(8192, envEmbeddingDim ?? providerDefaultDim));
+    const envEmbeddingDimRaw = toOptionalInt(process.env.COMMENT_EMBEDDING_DIM);
+    const envEmbeddingDim =
+      envEmbeddingDimRaw === 384 || envEmbeddingDimRaw === 1536 ? envEmbeddingDimRaw : null;
+    // OpenRouter text-embedding-3-small is fixed to 1536. For local, allow 384/1536 override.
+    const embeddingDim =
+      cfg.embeddingProvider === "openrouter" ? 1536 : envEmbeddingDim ?? providerDefaultDim;
     const embeddingModelLabel =
       cfg.embeddingProvider === "openrouter" ? embeddingModelName : `local-hash-${embeddingDim}`;
     const topK = toInt(process.env.COMMENT_TOP_K, 24);
@@ -359,7 +363,10 @@ export async function POST(req: Request) {
       return true;
     });
 
-    const hashMap = await fetchEmbeddingHashMap(embedCandidates.map((d) => String(d.id)));
+    const hashMap = await fetchEmbeddingHashMap(
+      embedCandidates.map((d) => String(d.id)),
+      embeddingDim,
+    );
     const toEmbed = embedCandidates.filter((d) => hashMap.get(String(d.id)) !== String(d.content_hash || ""));
     let embeddingError: string | null = null;
     let embeddedDocs = 0;
@@ -405,7 +412,7 @@ export async function POST(req: Request) {
             updated_at: nowIso,
           });
         }
-        await upsertEmbeddings(rows);
+        await upsertEmbeddings(rows, embeddingDim);
         embeddedDocs = rows.length;
       } catch (err) {
         embeddingError = err instanceof Error ? err.message : "Embedding upsert failed.";
@@ -456,6 +463,7 @@ export async function POST(req: Request) {
           sourceUrl: cfg.sourceUrl,
           crawlScope: cfg.crawlScope,
           sortMode: cfg.sortMode,
+          embeddingDim,
           queryEmbeddingLiteral,
           topK,
           excludeDeleted: cfg.excludeDeletedFromModel,
