@@ -44,6 +44,16 @@ type AnalyzeResponse = {
   documents: Array<Record<string, unknown>>;
 };
 
+type FormState = Record<string, string | number | boolean>;
+type PresetSlot = "preset1" | "preset2";
+type CustomPresetMap = Record<PresetSlot, FormState | null>;
+
+const CUSTOM_PRESET_STORAGE_KEY = "ai_comment_analysis_custom_presets_v1";
+const EMPTY_CUSTOM_PRESETS: CustomPresetMap = {
+  preset1: null,
+  preset2: null,
+};
+
 const DEFAULT_FORM = {
   sourceUrl: "",
   userQuery: "",
@@ -77,17 +87,9 @@ const DEFAULT_FORM = {
   piiMaskBeforeModel: true,
 };
 
-function isNaverNewsUrl(rawUrl: string): boolean {
-  try {
-    const u = new URL(rawUrl);
-    return /(^|\.)news\.naver\.com$/i.test(u.host) && /\/article(\/comment)?\//.test(u.pathname);
-  } catch {
-    return false;
-  }
-}
-
 export default function HomePage() {
-  const [form, setForm] = useState<Record<string, string | number | boolean>>(DEFAULT_FORM);
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [customPresets, setCustomPresets] = useState<CustomPresetMap>(EMPTY_CUSTOM_PRESETS);
   const [userTier, setUserTier] = useState<"general" | "pro">("general");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -123,6 +125,22 @@ export default function HomePage() {
     if (!Boolean(form.usePaidEmbedding)) return;
     setForm((s) => ({ ...s, usePaidEmbedding: false }));
   }, [form.usePaidEmbedding, userTier]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(CUSTOM_PRESET_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const next: CustomPresetMap = { ...EMPTY_CUSTOM_PRESETS };
+      for (const slot of ["preset1", "preset2"] as const) {
+        const candidate = parsed?.[slot];
+        if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+          next[slot] = candidate as FormState;
+        }
+      }
+      setCustomPresets(next);
+    } catch {}
+  }, []);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -163,6 +181,42 @@ export default function HomePage() {
       apiHasMorePath: "result.morePage.next",
       apiNextCursorPath: "result.morePage.next",
     }));
+  };
+
+  const saveCustomPreset = (slot: PresetSlot) => {
+    const snapshot: FormState = { ...form };
+    delete snapshot.sourceUrl;
+    const next: CustomPresetMap = {
+      ...customPresets,
+      [slot]: snapshot,
+    };
+    setCustomPresets(next);
+    try {
+      window.localStorage.setItem(CUSTOM_PRESET_STORAGE_KEY, JSON.stringify(next));
+    } catch {}
+    setError("");
+  };
+
+  const loadCustomPreset = (slot: PresetSlot) => {
+    const preset = customPresets[slot];
+    if (!preset) {
+      setError(`프리셋 ${slot === "preset1" ? "1" : "2"}이 비어 있습니다. 먼저 저장해 주세요.`);
+      return;
+    }
+    setForm((s) => ({ ...s, ...preset }));
+    setError("");
+  };
+
+  const clearCustomPreset = (slot: PresetSlot) => {
+    const next: CustomPresetMap = {
+      ...customPresets,
+      [slot]: null,
+    };
+    setCustomPresets(next);
+    try {
+      window.localStorage.setItem(CUSTOM_PRESET_STORAGE_KEY, JSON.stringify(next));
+    } catch {}
+    setError("");
   };
 
   return (
@@ -221,13 +275,50 @@ export default function HomePage() {
                 <button type="button" className="preset-btn" onClick={applyNaverPreset}>
                   네이버 프리셋
                 </button>
-                <span className="muted">
-                  네이버 뉴스 URL은 댓글 API를 우선으로 자동 수집합니다.
-                </span>
+                <div className="custom-preset-group">
+                  <button
+                    type="button"
+                    className="preset-btn secondary"
+                    disabled={!customPresets.preset1}
+                    onClick={() => loadCustomPreset("preset1")}
+                  >
+                    프리셋 1 적용
+                  </button>
+                  <button type="button" className="preset-btn ghost" onClick={() => saveCustomPreset("preset1")}>
+                    프리셋 1 저장
+                  </button>
+                  <button
+                    type="button"
+                    className="preset-btn ghost"
+                    disabled={!customPresets.preset1}
+                    onClick={() => clearCustomPreset("preset1")}
+                  >
+                    프리셋 1 삭제
+                  </button>
+                </div>
+                <div className="custom-preset-group">
+                  <button
+                    type="button"
+                    className="preset-btn secondary"
+                    disabled={!customPresets.preset2}
+                    onClick={() => loadCustomPreset("preset2")}
+                  >
+                    프리셋 2 적용
+                  </button>
+                  <button type="button" className="preset-btn ghost" onClick={() => saveCustomPreset("preset2")}>
+                    프리셋 2 저장
+                  </button>
+                  <button
+                    type="button"
+                    className="preset-btn ghost"
+                    disabled={!customPresets.preset2}
+                    onClick={() => clearCustomPreset("preset2")}
+                  >
+                    프리셋 2 삭제
+                  </button>
+                </div>
               </div>
-              {isNaverNewsUrl(String(form.sourceUrl || "")) ? (
-                <p className="muted">네이버 URL 감지됨: 플랫폼 API를 먼저 시도합니다.</p>
-              ) : null}
+              <p className="muted">프리셋 1/2는 현재 브라우저에 저장되어, 같은 브라우저로 재접속 시 유지됩니다.</p>
             </div>
 
             <div className="field">
@@ -257,10 +348,6 @@ export default function HomePage() {
             </div>
             <p className="muted">
               수집 모드는 <code>auto</code>로 고정됩니다. (API 우선 - 외부 동적 크롤러 - 정적/목록 폴백 순)
-            </p>
-            <p className="muted">
-              JS 의존 사이트는 <code>CRAWLER_SERVICE_URL</code>에 Playwright/Puppeteer 크롤러를 연결하면
-              스크롤/더보기/페이지네이션 뒤의 댓글까지 수집할 수 있습니다.
             </p>
 
             <div className="row-2">

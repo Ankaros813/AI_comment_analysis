@@ -158,7 +158,14 @@ a {
 
 .preset-row {
   margin-top: 8px;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.custom-preset-group {
+  display: inline-flex;
   gap: 6px;
 }
 
@@ -176,6 +183,31 @@ a {
 
 .preset-btn:hover {
   background: #cffafe;
+}
+
+.preset-btn.secondary {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.preset-btn.secondary:hover {
+  background: #dbeafe;
+}
+
+.preset-btn.ghost {
+  border-color: #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+
+.preset-btn.ghost:hover {
+  background: #f8fafc;
+}
+
+.preset-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .tier-row {
