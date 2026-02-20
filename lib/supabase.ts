@@ -120,7 +120,13 @@ export async function upsertEmbeddings(rows: Record<string, unknown>[]) {
     const { error } = await supabase.from("comment_embeddings").upsert(chunk, {
       onConflict: "document_id",
     });
-    if (error) throw error;
+    if (error) {
+      const parts = [error.message || "Embedding upsert failed"];
+      if (error.code) parts.push(`code=${error.code}`);
+      if (error.details) parts.push(`details=${error.details}`);
+      if (error.hint) parts.push(`hint=${error.hint}`);
+      throw new Error(parts.join(" | "));
+    }
   }
 }
 

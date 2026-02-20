@@ -13,7 +13,7 @@ import {
   upsertDocuments,
   upsertEmbeddings,
 } from "@/lib/supabase";
-import { isProbableSpam, maskPII } from "@/lib/text-ops";
+import { isProbableSpam, maskPII, stableSha1 } from "@/lib/text-ops";
 import type { AnalyzeRequest, CrawlInstructionPlan, CrawledComment, RuntimeConfig } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -373,12 +373,28 @@ export async function POST(req: Request) {
                 dim: embeddingDim,
               });
         const nowIso = new Date().toISOString();
-        const rows = toEmbed.map((d, idx) => ({
-          document_id: d.id,
-          embedding: vectorLiteral(vectors[idx] || []),
-          content_hash: d.content_hash,
-          updated_at: nowIso,
-        }));
+        const rows: Record<string, unknown>[] = [];
+        for (let idx = 0; idx < toEmbed.length; idx += 1) {
+          const d = toEmbed[idx];
+          const docId = String(d.id || "").trim();
+          if (!docId) continue;
+
+          const vec = Array.isArray(vectors[idx]) ? (vectors[idx] as number[]) : [];
+          if (vec.length !== embeddingDim) {
+            throw new Error(`Embedding vector invalid for document ${docId}: expected ${embeddingDim}, got ${vec.length}`);
+          }
+
+          const contentHash =
+            String(d.content_hash || "").trim() ||
+            stableSha1(`${cfg.sourceUrl}|${docId}|${String(d.content || "")}|${String(d.pii_masked_content || "")}`);
+
+          rows.push({
+            document_id: docId,
+            embedding: vectorLiteral(vec),
+            content_hash: contentHash,
+            updated_at: nowIso,
+          });
+        }
         await upsertEmbeddings(rows);
         embeddedDocs = rows.length;
       } catch (err) {
