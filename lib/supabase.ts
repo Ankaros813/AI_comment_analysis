@@ -61,10 +61,14 @@ export async function upsertCrawlState(input: {
 export async function upsertDocuments(rows: Record<string, unknown>[]) {
   if (!rows.length) return;
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("documents").upsert(rows, {
-    onConflict: "source_url,external_id",
-  });
-  if (error) throw error;
+  const chunkSize = 500;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await supabase.from("documents").upsert(chunk, {
+      onConflict: "source_url,external_id",
+    });
+    if (error) throw error;
+  }
 }
 
 export async function fetchDocumentsByExternalIds(sourceUrl: string, externalIds: string[]) {
@@ -109,10 +113,15 @@ export async function fetchEmbeddingHashMap(documentIds: string[]) {
 export async function upsertEmbeddings(rows: Record<string, unknown>[]) {
   if (!rows.length) return;
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("comment_embeddings").upsert(rows, {
-    onConflict: "document_id",
-  });
-  if (error) throw error;
+  // Vector payloads are large; batch writes to avoid PostgREST payload/time limits.
+  const chunkSize = 24;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await supabase.from("comment_embeddings").upsert(chunk, {
+      onConflict: "document_id",
+    });
+    if (error) throw error;
+  }
 }
 
 export async function searchSimilarDocuments(input: {
