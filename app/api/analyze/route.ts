@@ -53,6 +53,13 @@ function trimOrDefault(v: unknown, fallback: string): string {
   return s || fallback;
 }
 
+function asRecord(v: unknown): Record<string, unknown> {
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    return v as Record<string, unknown>;
+  }
+  return {};
+}
+
 function buildConfig(body: AnalyzeRequest): RuntimeConfig {
   const userTier: RuntimeConfig["userTier"] = body.userTier === "pro" ? "pro" : "general";
   const providerRaw = String(body.embeddingProvider || "").trim().toLowerCase();
@@ -290,8 +297,10 @@ export async function POST(req: Request) {
     const rawDocumentRows = effectiveComments.map((c) => {
       const masked = maskPII(c.content);
       const spam = isProbableSpam(c.content, c.author, cfg.spamKeywordsCsv);
+      const commentMetadata = asRecord(c.metadata);
       return {
-        source_url: c.source_url,
+        // Keep retrieval isolation strict: all rows from this run are keyed by the input URL.
+        source_url: cfg.sourceUrl,
         crawl_scope: cfg.crawlScope,
         sort_mode: cfg.sortMode,
         external_id: c.external_id,
@@ -304,7 +313,12 @@ export async function POST(req: Request) {
         status: c.status,
         is_spam: spam,
         source_type: c.source_type,
-        metadata: c.metadata,
+        metadata: {
+          ...commentMetadata,
+          input_source_url: cfg.sourceUrl,
+          crawl_scope: cfg.crawlScope,
+          sort_mode: cfg.sortMode,
+        },
         content_hash: c.content_hash,
         last_seen_at: nowIso,
         updated_at: nowIso,

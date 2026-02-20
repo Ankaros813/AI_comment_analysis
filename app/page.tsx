@@ -196,8 +196,8 @@ export default function HomePage() {
           <div className="hero-copy">
             <h1>Realtime AI Comment Analyzer</h1>
             <p>
-              Vercel + Supabase + OpenRouter 湲곕컲?쇰줈 ?ㅼ떆媛??볤???鍮좊Ⅴ寃??섏쭛?섍퀬 遺꾩꽍?⑸땲?? ?щ·留?URL, ?섏쭛 議곌굔
-              ?먯뿰??吏?? 遺꾩꽍 ?꾨＼?꾪듃瑜??낅젰???ㅽ뻾?????덉뒿?덈떎.
+              Built with Vercel, Supabase, and OpenRouter. Enter a source URL, optional crawl instruction, and your
+              analysis prompt to collect comments and generate AI insights.
             </p>
           </div>
         </section>
@@ -275,8 +275,8 @@ export default function HomePage() {
                   value={String(form.collectionMode || "single_page")}
                   onChange={(e) => setForm((s) => ({ ...s, collectionMode: e.target.value }))}
                 >
-                  <option value="single_page">single_page (湲곕낯)</option>
-                  <option value="list_to_posts">list_to_posts (紐⑸줉?믨쾶?쒓??믩뙎湲)</option>
+                  <option value="single_page">single_page (default)</option>
+                  <option value="list_to_posts">list_to_posts (crawl list pages and each post)</option>
                 </select>
               </div>
               <div className="field">
@@ -290,7 +290,7 @@ export default function HomePage() {
             </div>
             {String(form.collectionMode || "single_page") === "list_to_posts" ? (
               <p className="muted">
-                紐⑸줉 ?섏씠吏?먯꽌 寃뚯떆湲 留곹겕瑜??섏쭛???? 媛?寃뚯떆湲???ㅼ뼱媛 ?볤???紐⑥쓭?덈떎.
+                Crawl list pages, collect post links, then enter each post and collect comments.
               </p>
             ) : null}
 
@@ -606,7 +606,7 @@ export default function HomePage() {
 
                 {result.crawlPlan && (
                   <div className="plan-box">
-                    <strong>?섏쭛議곌굔 ?댁꽍 寃곌낵</strong>
+                    <strong>Crawl instruction plan</strong>
                     <div className="muted">
                       start={result.crawlPlan.startDate || "null"} | end={result.crawlPlan.endDate || "null"} |
                       target={result.crawlPlan.targetCommentCount || "null"} | recommended_pages=
