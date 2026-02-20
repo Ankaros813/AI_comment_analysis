@@ -140,12 +140,12 @@ export default function HomePage() {
         }),
       });
       const json = (await res.json()) as AnalyzeResponse & { error?: string };
-      if (!res.ok) throw new Error(json.error || `Request failed: ${res.status}`);
+      if (!res.ok) throw new Error(json.error || `요청 실패: ${res.status}`);
       setResult(json);
       setProgress(100);
     } catch (err) {
       setProgress(100);
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
     } finally {
       setLoading(false);
     }
@@ -167,7 +167,8 @@ export default function HomePage() {
 
   return (
     <main className="page">
-      <div className="container">        <section className="hero">
+      <div className="container">
+        <section className="hero">
           <div className="hero-logo" aria-hidden="true">
             <svg className="hero-logo-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
               <defs>
@@ -194,10 +195,10 @@ export default function HomePage() {
             </svg>
           </div>
           <div className="hero-copy">
-            <h1>Realtime AI Comment Analyzer</h1>
+            <h1>실시간 AI 댓글 분석기</h1>
             <p>
-              Built with Vercel, Supabase, and OpenRouter. Enter a source URL, optional crawl instruction, and your
-              analysis prompt to collect comments and generate AI insights.
+              Vercel, Supabase, OpenRouter 기반으로 동작합니다. 소스 URL과 수집 지시문(선택), 분석 프롬프트를
+              입력하면 댓글을 수집하고 AI 분석 결과를 생성합니다.
             </p>
           </div>
         </section>
@@ -209,7 +210,7 @@ export default function HomePage() {
                 <span className="required-star" aria-hidden="true">
                   *
                 </span>{" "}
-                Source URL
+                소스 URL
               </label>
               <input
                 value={String(form.sourceUrl || "")}
@@ -218,49 +219,48 @@ export default function HomePage() {
               />
               <div className="preset-row">
                 <button type="button" className="preset-btn" onClick={applyNaverPreset}>
-                  Naver Preset
+                  네이버 프리셋
                 </button>
                 <span className="muted">
-                  For Naver news URLs, auto crawl prioritizes the Naver comment API.
+                  네이버 뉴스 URL은 댓글 API를 우선으로 자동 수집합니다.
                 </span>
               </div>
               {isNaverNewsUrl(String(form.sourceUrl || "")) ? (
-                <p className="muted">Naver URL detected: auto crawl will try platform API first.</p>
+                <p className="muted">네이버 URL 감지됨: 플랫폼 API를 먼저 시도합니다.</p>
               ) : null}
             </div>
 
             <div className="field">
-              <label>Crawl Instruction (optional)</label>
+              <label>수집 지시문 (선택)</label>
               <textarea
                 value={String(form.crawlTargetInstruction || "")}
                 onChange={(e) => setForm((s) => ({ ...s, crawlTargetInstruction: e.target.value }))}
-                placeholder="Example: collect up to 300 recent comments and analyze trend/risk."
+                placeholder="예: 최근 댓글 300개까지 수집하고 여론 흐름과 리스크를 분석해줘."
               />
             </div>
 
             <div className="field">
-              <label>RAG Prompt</label>
+              <label>RAG 프롬프트</label>
               <textarea
                 value={String(form.userQuery || "")}
                 onChange={(e) => setForm((s) => ({ ...s, userQuery: e.target.value }))}
-                placeholder="Example: summarize sentiment, top issues, and immediate actions."
+                placeholder="예: 감성 분포, 핵심 이슈, 즉시 실행 액션을 요약해줘."
               />
             </div>
 
             <div className="field">
-              <label>Model</label>
+              <label>모델</label>
               <input
                 value={String(form.modelName || "")}
                 onChange={(e) => setForm((s) => ({ ...s, modelName: e.target.value }))}
               />
             </div>
             <p className="muted">
-              Crawl mode is fixed to <code>auto</code> (API-first, then external dynamic crawler if configured, then
-              static/list fallback).
+              수집 모드는 <code>auto</code>로 고정됩니다. (API 우선 - 외부 동적 크롤러 - 정적/목록 폴백 순)
             </p>
             <p className="muted">
-              For JS-heavy sites, set <code>CRAWLER_SERVICE_URL</code> to a Playwright/Puppeteer crawler service to
-              collect comments behind scroll, more buttons, and pagination.
+              JS 의존 사이트는 <code>CRAWLER_SERVICE_URL</code>에 Playwright/Puppeteer 크롤러를 연결하면
+              스크롤/더보기/페이지네이션 뒤의 댓글까지 수집할 수 있습니다.
             </p>
 
             <div className="row-2">
@@ -269,18 +269,18 @@ export default function HomePage() {
                   <span className="required-star" aria-hidden="true">
                     *
                   </span>{" "}
-                  Collection Mode
+                  수집 모드
                 </label>
                 <select
                   value={String(form.collectionMode || "single_page")}
                   onChange={(e) => setForm((s) => ({ ...s, collectionMode: e.target.value }))}
                 >
-                  <option value="single_page">single_page (default)</option>
-                  <option value="list_to_posts">list_to_posts (crawl list pages and each post)</option>
+                  <option value="single_page">single_page (기본)</option>
+                  <option value="list_to_posts">list_to_posts (목록 페이지 후 각 게시글 수집)</option>
                 </select>
               </div>
               <div className="field">
-                <label>Max Posts (list mode)</label>
+                <label>최대 게시글 수 (list 모드)</label>
                 <input
                   type="number"
                   value={Number(form.maxPosts || 40)}
@@ -290,32 +290,32 @@ export default function HomePage() {
             </div>
             {String(form.collectionMode || "single_page") === "list_to_posts" ? (
               <p className="muted">
-                Crawl list pages, collect post links, then enter each post and collect comments.
+                목록 페이지에서 게시글 링크를 모은 뒤 각 게시글에 들어가 댓글을 수집합니다.
               </p>
             ) : null}
 
             <div className="field">
-              <label>User Tier</label>
+              <label>사용자 등급</label>
               <div className="tier-row">
                 <button
                   type="button"
                   className={`tier-btn ${userTier === "general" ? "active" : ""}`}
                   onClick={() => setUserTier("general")}
                 >
-                  General
+                  일반
                 </button>
                 <button
                   type="button"
                   className={`tier-btn ${userTier === "pro" ? "active" : ""}`}
                   onClick={() => setUserTier("pro")}
                 >
-                  Pro
+                  프로
                 </button>
               </div>
             </div>
 
             <div className="field">
-              <label>Embedding Mode</label>
+              <label>임베딩 모드</label>
               <div className="toggle-row">
                 <button
                   type="button"
@@ -335,23 +335,23 @@ export default function HomePage() {
                 </button>
                 <div className="switch-text">
                   <strong>
-                    {Boolean(form.usePaidEmbedding) ? "ON: text-embedding-3-small" : "OFF: Local embedding"}
+                    {Boolean(form.usePaidEmbedding) ? "ON: text-embedding-3-small" : "OFF: 로컬 임베딩"}
                   </strong>
-                  <span>{userTier === "pro" ? "Pro can switch this on." : "General users stay in free mode."}</span>
+                  <span>{userTier === "pro" ? "프로 등급에서 ON 설정 가능" : "일반 등급은 무료 모드 고정"}</span>
                 </div>
               </div>
             </div>
 
             <div className="row-2">
               <div className="field">
-                <label>Crawl Scope</label>
+                <label>수집 범위</label>
                 <input
                   value={String(form.crawlScope || "")}
                   onChange={(e) => setForm((s) => ({ ...s, crawlScope: e.target.value }))}
                 />
               </div>
               <div className="field">
-                <label>Sort Mode</label>
+                <label>정렬 모드</label>
                 <input
                   value={String(form.sortMode || "")}
                   onChange={(e) => setForm((s) => ({ ...s, sortMode: e.target.value }))}
@@ -361,7 +361,7 @@ export default function HomePage() {
 
             <div className="row-2">
               <div className="field">
-                <label>Max Pages</label>
+                <label>최대 페이지 수</label>
                 <input
                   type="number"
                   value={Number(form.maxPages || 8)}
@@ -369,7 +369,7 @@ export default function HomePage() {
                 />
               </div>
               <div className="field">
-                <label>Lookback Hours</label>
+                <label>룩백 시간 (시간)</label>
                 <input
                   type="number"
                   value={Number(form.lookbackHours || 24)}
@@ -380,7 +380,7 @@ export default function HomePage() {
 
             <div className="row-2">
               <div className="field">
-                <label>Comment Pages/Post (list mode)</label>
+                <label>게시글당 댓글 페이지 수 (list 모드)</label>
                 <input
                   type="number"
                   value={Number(form.maxCommentPagesPerPost || 3)}
@@ -390,58 +390,58 @@ export default function HomePage() {
             </div>
 
             <details>
-              <summary>HTML Selectors</summary>
+              <summary>HTML 셀렉터</summary>
               <div className="field">
-                <label>Comment Selector</label>
+                <label>댓글 셀렉터</label>
                 <input
                   value={String(form.commentSelector || "")}
                   onChange={(e) => setForm((s) => ({ ...s, commentSelector: e.target.value }))}
                 />
               </div>
               <div className="field">
-                <label>Author Selector</label>
+                <label>작성자 셀렉터</label>
                 <input
                   value={String(form.authorSelector || "")}
                   onChange={(e) => setForm((s) => ({ ...s, authorSelector: e.target.value }))}
                 />
               </div>
               <div className="field">
-                <label>Datetime Selector</label>
+                <label>날짜 셀렉터</label>
                 <input
                   value={String(form.datetimeSelector || "")}
                   onChange={(e) => setForm((s) => ({ ...s, datetimeSelector: e.target.value }))}
                 />
               </div>
               <div className="field">
-                <label>Next Page Selector</label>
+                <label>다음 페이지 셀렉터</label>
                 <input
                   value={String(form.nextPageSelector || "")}
                   onChange={(e) => setForm((s) => ({ ...s, nextPageSelector: e.target.value }))}
                 />
               </div>
               <div className="field">
-                <label>List Next Page Selector (list mode)</label>
+                <label>목록 다음 페이지 셀렉터 (list 모드)</label>
                 <input
                   value={String(form.listNextPageSelector || "")}
                   onChange={(e) => setForm((s) => ({ ...s, listNextPageSelector: e.target.value }))}
                 />
               </div>
               <div className="field">
-                <label>Comment Next Page Selector (list mode)</label>
+                <label>댓글 다음 페이지 셀렉터 (list 모드)</label>
                 <input
                   value={String(form.commentNextPageSelector || "")}
                   onChange={(e) => setForm((s) => ({ ...s, commentNextPageSelector: e.target.value }))}
                 />
               </div>
               <div className="field">
-                <label>Post Link Selector (list mode)</label>
+                <label>게시글 링크 셀렉터 (list 모드)</label>
                 <input
                   value={String(form.postLinkSelector || "")}
                   onChange={(e) => setForm((s) => ({ ...s, postLinkSelector: e.target.value }))}
                 />
               </div>
               <div className="field">
-                <label>Post URL Includes (comma-separated)</label>
+                <label>게시글 URL 포함 조건 (쉼표 구분)</label>
                 <input
                   value={String(form.postUrlIncludes || "")}
                   onChange={(e) => setForm((s) => ({ ...s, postUrlIncludes: e.target.value }))}
@@ -449,7 +449,7 @@ export default function HomePage() {
                 />
               </div>
               <div className="field">
-                <label>Post URL Regex (optional)</label>
+                <label>게시글 URL 정규식 (선택)</label>
                 <input
                   value={String(form.postUrlRegex || "")}
                   onChange={(e) => setForm((s) => ({ ...s, postUrlRegex: e.target.value }))}
@@ -459,9 +459,9 @@ export default function HomePage() {
             </details>
 
             <details>
-              <summary>API Mode Settings</summary>
+              <summary>API 모드 설정</summary>
               <div className="field">
-                <label>API Endpoint</label>
+                <label>API 엔드포인트</label>
                 <input
                   value={String(form.apiEndpoint || "")}
                   onChange={(e) => setForm((s) => ({ ...s, apiEndpoint: e.target.value }))}
@@ -470,7 +470,7 @@ export default function HomePage() {
               </div>
               <div className="row-2">
                 <div className="field">
-                  <label>API Method</label>
+                  <label>API 메서드</label>
                   <select
                     value={String(form.apiMethod || "GET")}
                     onChange={(e) => setForm((s) => ({ ...s, apiMethod: e.target.value }))}
@@ -480,7 +480,7 @@ export default function HomePage() {
                   </select>
                 </div>
                 <div className="field">
-                  <label>Comments Path</label>
+                  <label>댓글 경로</label>
                   <input
                     value={String(form.apiCommentsPath || "")}
                     onChange={(e) => setForm((s) => ({ ...s, apiCommentsPath: e.target.value }))}
@@ -489,14 +489,14 @@ export default function HomePage() {
               </div>
               <div className="row-2">
                 <div className="field">
-                  <label>Has More Path</label>
+                  <label>추가 페이지 여부 경로</label>
                   <input
                     value={String(form.apiHasMorePath || "")}
                     onChange={(e) => setForm((s) => ({ ...s, apiHasMorePath: e.target.value }))}
                   />
                 </div>
                 <div className="field">
-                  <label>Next Cursor Path</label>
+                  <label>다음 커서 경로</label>
                   <input
                     value={String(form.apiNextCursorPath || "")}
                     onChange={(e) => setForm((s) => ({ ...s, apiNextCursorPath: e.target.value }))}
@@ -506,7 +506,7 @@ export default function HomePage() {
             </details>
 
             <details>
-              <summary>Model Filters</summary>
+              <summary>모델 필터</summary>
               <div className="field">
                 <label>
                   <input
@@ -514,7 +514,7 @@ export default function HomePage() {
                     checked={Boolean(form.excludeDeletedFromModel)}
                     onChange={(e) => setForm((s) => ({ ...s, excludeDeletedFromModel: e.target.checked }))}
                   />{" "}
-                  Exclude deleted comments
+                  삭제 댓글 제외
                 </label>
               </div>
               <div className="field">
@@ -524,7 +524,7 @@ export default function HomePage() {
                     checked={Boolean(form.excludeSpamFromModel)}
                     onChange={(e) => setForm((s) => ({ ...s, excludeSpamFromModel: e.target.checked }))}
                   />{" "}
-                  Exclude spam comments
+                  스팸 댓글 제외
                 </label>
               </div>
               <div className="field">
@@ -534,13 +534,13 @@ export default function HomePage() {
                     checked={Boolean(form.piiMaskBeforeModel)}
                     onChange={(e) => setForm((s) => ({ ...s, piiMaskBeforeModel: e.target.checked }))}
                   />{" "}
-                  PII mask before embedding/LLM
+                  임베딩/LLM 전 개인정보 마스킹
                 </label>
               </div>
             </details>
 
             <button className="btn" type="submit" disabled={loading || !canSubmit}>
-              {loading ? "Analyzing..." : "Analyze"}
+              {loading ? "분석 중..." : "분석 시작"}
             </button>
 
             {progress > 0 && (
@@ -552,91 +552,91 @@ export default function HomePage() {
               </div>
             )}
 
-            <p className="muted">Tip: keep `maxPages` low on free tier for fast response.</p>
+            <p className="muted">팁: 무료 티어에서는 빠른 응답을 위해 `maxPages`를 낮게 유지하세요.</p>
             {error ? <div className="error">{error}</div> : null}
           </form>
 
           <section className="panel">
             {!result ? (
-              <p className="muted">Run analysis to see metrics, keywords, and AI summary.</p>
+              <p className="muted">분석을 실행하면 수집 지표, 키워드, AI 요약이 표시됩니다.</p>
             ) : (
               <>
                 <div className="metrics">
                   <div className="metric">
-                    <div className="k">Scanned pages</div>
+                    <div className="k">스캔한 페이지</div>
                     <div className="v">{result.ingestion.pagesScanned}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">Found comments (unique)</div>
+                    <div className="k">수집 댓글 (고유)</div>
                     <div className="v">{result.ingestion.commentsFound}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">Found rows (raw)</div>
+                    <div className="k">수집 행 (원본)</div>
                     <div className="v">{result.ingestion.commentsFoundRaw ?? result.ingestion.commentsFound}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">Unique IDs</div>
+                    <div className="k">고유 ID 수</div>
                     <div className="v">{result.ingestion.uniqueExternalIds ?? result.ingestion.commentsKept}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">Stored docs</div>
+                    <div className="k">저장 문서 수</div>
                     <div className="v">{result.ingestion.storedDocs}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">Embedded docs</div>
+                    <div className="k">임베딩 문서 수</div>
                     <div className="v">{result.ingestion.embeddedDocs}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">Deleted detected</div>
+                    <div className="k">삭제 감지 수</div>
                     <div className="v">{result.ingestion.deletedDetected}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">Spam detected</div>
+                    <div className="k">스팸 감지 수</div>
                     <div className="v">{result.ingestion.spamDetected}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">Skipped unchanged embeds</div>
+                    <div className="k">임베딩 스킵 수</div>
                     <div className="v">{result.ingestion.embeddingSkippedUnchanged}</div>
                   </div>
                   <div className="metric">
-                    <div className="k">RAG docs</div>
+                    <div className="k">RAG 문서 수</div>
                     <div className="v">{result.documents.length}</div>
                   </div>
                 </div>
 
                 {result.crawlPlan && (
                   <div className="plan-box">
-                    <strong>Crawl instruction plan</strong>
+                    <strong>수집 지시 해석 결과</strong>
                     <div className="muted">
-                      start={result.crawlPlan.startDate || "null"} | end={result.crawlPlan.endDate || "null"} |
-                      target={result.crawlPlan.targetCommentCount || "null"} | recommended_pages=
+                      시작={result.crawlPlan.startDate || "null"} | 종료={result.crawlPlan.endDate || "null"} |
+                      목표={result.crawlPlan.targetCommentCount || "null"} | 권장_페이지=
                       {result.crawlPlan.recommendedMaxPages || "null"}
                     </div>
                   </div>
                 )}
 
                 <p className="muted">
-                  mode={result.ingestion.crawlMode}
-                  {result.ingestion.crawlNotes ? ` | note=${result.ingestion.crawlNotes}` : ""}
+                  모드={result.ingestion.crawlMode}
+                  {result.ingestion.crawlNotes ? ` | 메모=${result.ingestion.crawlNotes}` : ""}
                   {typeof result.ingestion.externalIdDedupDropped === "number"
-                    ? ` | dedup_dropped=${result.ingestion.externalIdDedupDropped}`
+                    ? ` | 중복제거=${result.ingestion.externalIdDedupDropped}`
                     : ""}
                 </p>
                 <p className="muted">
-                  embedding={result.ingestion.embeddingProvider || "unknown"} /{" "}
+                  임베딩={result.ingestion.embeddingProvider || "unknown"} /{" "}
                   {result.ingestion.embeddingModel || "unknown"}
-                  {` | tier=${userTier}`}
-                  {result.ingestion.embeddingError ? ` | embedding_error=${result.ingestion.embeddingError}` : ""}
+                  {` | 등급=${userTier}`}
+                  {result.ingestion.embeddingError ? ` | 임베딩오류=${result.ingestion.embeddingError}` : ""}
                 </p>
 
-                <h3>Sentiment</h3>
+                <h3>감성 분포</h3>
                 <div className="chips">
-                  <span className="chip">positive {result.sentimentCounts.positive}</span>
-                  <span className="chip">neutral {result.sentimentCounts.neutral}</span>
-                  <span className="chip">negative {result.sentimentCounts.negative}</span>
+                  <span className="chip">긍정 {result.sentimentCounts.positive}</span>
+                  <span className="chip">중립 {result.sentimentCounts.neutral}</span>
+                  <span className="chip">부정 {result.sentimentCounts.negative}</span>
                 </div>
 
-                <h3>Top Keywords</h3>
+                <h3>주요 키워드</h3>
                 <div className="chips">
                   {result.keywords.map((k) => (
                     <span key={k.keyword} className="chip">
@@ -645,21 +645,21 @@ export default function HomePage() {
                   ))}
                 </div>
 
-                <h3>AI Analysis</h3>
+                <h3>AI 분석</h3>
                 <div className="output">
                   <ReactMarkdown>{result.analysisMarkdown}</ReactMarkdown>
                 </div>
 
-                <h3>Retrieved Comment Preview</h3>
+                <h3>수집 댓글 미리보기</h3>
                 <div className="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>time</th>
-                        <th>author</th>
-                        <th>status</th>
-                        <th>spam</th>
-                        <th>content</th>
+                        <th>시간</th>
+                        <th>작성자</th>
+                        <th>상태</th>
+                        <th>스팸</th>
+                        <th>내용</th>
                       </tr>
                     </thead>
                     <tbody>
